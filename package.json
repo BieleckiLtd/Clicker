@@ -1,0 +1,18 @@
+{
+  "name": "hello-tv",
+  "private": true,
+  "scripts": {
+    "start": "http-server app -a 127.0.0.1 -p 8080 -c-1",
+    "test": "node --test --test-concurrency=1 tests/*.test.cjs",
+    "package": "npx -y -p @webos-tools/cli ares-package app -o dist",
+    "tv:install": "npx -y -p @webos-tools/cli ares-install -d mytv dist/com.example.hellotv_1.6.0_all.ipk",
+    "tv:launch": "npx -y -p @webos-tools/cli ares-launch -d mytv com.example.hellotv"
+  },
+  "devDependencies": {
+    "@twemoji/api": "17.0.3",
+    "acorn": "^8.15.0",
+    "hls.js": "1.7.3",
+    "http-server": "^14.1.1",
+    "playwright": "1.62.1"
+  }
+}

@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="referrer" content="never">
+<title>X TV</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app" class="screen-browse">
+  <nav id="nav">
+    <div class="brand"><img class="logo" alt="" src="logo.png"></div>
+    <button type="button" class="nav-btn" data-nav="home">
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.2 12 3.5l8.5 6.7V20h-5.5v-6h-6v6H3.5z"/></svg></span>
+      <span class="lbl">Home</span>
+    </button>
+    <button type="button" class="nav-btn" data-nav="search">
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg></span>
+      <span class="lbl">Search</span>
+    </button>
+    <button type="button" class="nav-btn" data-nav="history">
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.5-6L3.5 8.5"/><path d="M3.5 3.5v5h5M12 7.5V12l3 2"/></svg></span>
+      <span class="lbl">History</span>
+    </button>
+    <button type="button" class="nav-btn" data-nav="refresh">
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 12a8.5 8.5 0 1 1-2.5-6l2.5 2.5"/><path d="M20.5 3.5v5h-5"/></svg></span>
+      <span class="lbl">Refresh</span>
+    </button>
+    <button type="button" class="nav-btn" data-nav="back">
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7"/></svg></span>
+      <span class="lbl">Back</span>
+    </button>
+    <button type="button" class="nav-btn" data-nav="settings">
+      <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9.04 21.71 9.62v4.76L19 14.96l1.55 2.23-3.36 3.36L14.96 19l-.58 2.71H9.62L9.04 19l-2.23 1.55-3.36-3.36L4.96 14.86 2.29 14.38V9.62L5 9.04 3.45 6.81l3.36-3.36L9.04 5l.58-2.71h4.76L14.96 5l2.23-1.55 3.36 3.36z"/><circle cx="12" cy="12" r="3"/></svg></span>
+      <span class="lbl">Settings</span>
+    </button>
+    <div class="app-version">v<span class="build-label">1.6.0</span></div>
+  </nav>
+
+  <div id="stage">
+    <div id="backdrop" aria-hidden="true"><div class="fade"><div class="bd"></div><div class="bd"></div></div></div>
+    <header id="homeHeader">
+      <h1 id="homeTitle">Home</h1>
+      <div id="homeSummary">Recent videos and broadcasts, all in one place.</div>
+      <div id="clock">--:--</div>
+      <div id="homeChips"></div>
+    </header>
+    <div id="rows">
+      <div class="skel card"></div><div class="skel card"></div>
+      <div class="skel card"></div><div class="skel card"></div>
+      <div class="skel card"></div><div class="skel card"></div>
+      <div class="skel card"></div><div class="skel card"></div>
+    </div>
+  </div>
+
+  <div id="searchView">
+    <div id="searchLeft">
+      <div id="queryBox">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+        <div id="query"></div>
+      </div>
+      <div id="keys"></div>
+      <div id="searchTip">Find a channel, then watch its videos and live streams.</div>
+    </div>
+    <div id="searchRight">
+      <div id="chips"></div>
+      <div id="searchStatus" role="status" aria-live="polite"></div>
+      <div id="results"></div>
+    </div>
+  </div>
+
+  <div id="settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="settings-scrim" id="settingsScrim"></div>
+    <div class="settings-sheet">
+      <div class="settings-heading"><h2 id="settingsTitle">Settings</h2><button id="settingsClose" class="panel-close" type="button" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+      <div id="settingsList"></div>
+      <div class="settings-foot"><div class="settings-about">X TV <span class="build-label">1.6.0</span> · Public videos and broadcasts from X</div></div>
+    </div>
+  </div>
+
+  <div id="player">
+    <video id="video" referrerpolicy="no-referrer"></video>
+    <div id="loadLabel">Loading</div>
+    <div id="errLabel"></div>
+    <div id="seekPop"></div>
+    <div id="centerIcon">
+      <div class="tri"></div>
+      <div class="bars"><i></i><i></i></div>
+    </div>
+    <div id="statsPanel"></div>
+    <div id="postPanel"></div>
+    <div id="chrome" class="on">
+      <button type="button" class="player-back" id="playerBack" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></button>
+      <div class="pbot">
+        <div id="broadcastAudience" role="status"></div>
+        <div class="ptitle" id="ptitle"></div>
+        <div class="psub" id="psub"></div>
+        <div class="timeline-row">
+          <span id="tcur">0:00</span>
+          <div class="scrub" id="timeline" role="slider" aria-label="Playback timeline" aria-valuemin="0">
+            <div class="buffered" id="buffered"></div>
+            <div class="played" id="played"></div>
+            <div class="knob" id="knob"></div>
+          </div>
+          <span id="tend"></span>
+        </div>
+        <div class="player-controls">
+          <button type="button" class="player-action round" id="playButton" aria-label="Pause"><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14"/></svg><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.8v14.4L19 12z"/></svg></button>
+          <div class="spacer"></div>
+          <button type="button" class="player-action" id="captionsButton" aria-pressed="false" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10.6 10a2.4 2.4 0 1 0 0 4M17.1 10a2.4 2.4 0 1 0 0 4"/></svg><span>Captions</span></button>
+          <button type="button" class="player-action" id="postButton" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4v13h5l4 4v-4h7V4Z"/><path d="M8 8h8M8 12h5"/></svg><span>Post &amp; comments</span></button>
+          <button type="button" class="player-action" id="qualityButton" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/></svg><span id="qualityLabel">Quality</span></button>
+        </div>
+      </div>
+      <div id="captionsMenu"></div>
+      <div id="qualityMenu"></div>
+    </div>
+    <div id="captions" aria-live="off"></div>
+  </div>
+
+  <div id="toast"></div>
+</div>
+<script src="config.js"></script>
+<script src="favourites.js"></script>
+<script src="catalog.js"></script>
+<script src="broadcast.js"></script>
+<script src="captions.js"></script>
+<script src="vendor/hls.min.js"></script>
+<!-- Emoji artwork: Twemoji, Twitter and contributors, CC BY 4.0. See vendor/README.md. -->
+<script src="vendor/twemoji.min.js"></script>
+<script src="main.js"></script>
+</body>
+</html>
