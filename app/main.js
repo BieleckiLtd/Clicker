@@ -1153,8 +1153,7 @@
     var profile = filtered()[state.gridIndex];
     if (!profile || !window.HelloCatalog) return;
     var action = HelloCatalog.toggleFavourite(profile);
-    if (action === 'full') showToast('Remove a channel first');
-    else if (action === 'last') showToast('Keep at least one channel');
+    if (action === 'last') showToast('Keep at least one channel');
     else if (action === 'added' || action === 'removed') {
       loadHome(true);
       showToast((action === 'added' ? 'Added ' : 'Removed ') + (profile.name || profile.handle));

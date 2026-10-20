@@ -16,7 +16,6 @@
   var inflight = {};
 
   var FAV_KEY = 'hellotv.favourites';
-  var FAV_LIMIT = 10;
 
   function accounts() {
     var list = window.HELLO_TV && window.HELLO_TV.accounts;
@@ -76,7 +75,7 @@
 
   function toggleFavourite(profile) {
     var handle = profile && profile.handle;
-    if (!handle) return 'full';
+    if (!handle) return 'invalid';
     var list = favourites();
     var want = String(handle).toLowerCase();
     var next = [];
@@ -90,7 +89,6 @@
       writeFavourites(next);
       return 'removed';
     }
-    if (next.length >= FAV_LIMIT) return 'full';
     next.push({
       handle: handle,
       name: profile.name || handle,
