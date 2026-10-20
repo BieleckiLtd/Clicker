@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Connect live captions · X TV</title>
+<style>
+:root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#0c0c0c;color:#f5f5f5}*{box-sizing:border-box}body{margin:0;padding:30px 22px 50px}main{max-width:440px;margin:5vh auto}.brand{font-size:13px;font-weight:700;letter-spacing:2px;color:#999;margin-bottom:32px}h1{font-size:36px;line-height:1.1;letter-spacing:-1px;margin:0 0 14px}p{color:#aaa;line-height:1.6;font-size:16px}section{margin-top:28px;padding:24px;border:1px solid #303030;border-radius:22px;background:#151515}h2{font-size:19px;margin:0 0 12px}.number{display:inline-grid;place-items:center;width:26px;height:26px;background:#333;border-radius:50%;margin-right:8px;font-size:14px}a,button{display:block;border:0;border-radius:13px;padding:15px 18px;text-align:center;font-size:16px;font-weight:650;cursor:pointer;text-decoration:none}a{background:#292929;color:white;margin:18px 0 8px}button{background:white;color:#111;width:100%;margin-top:16px}button:disabled{opacity:.5;cursor:wait}label{display:block;font-size:14px;color:#bbb;margin:18px 0 8px}input{width:100%;background:#0c0c0c;border:1px solid #444;border-radius:12px;padding:15px;color:white;font-size:16px}input:focus{outline:2px solid #ddd;outline-offset:2px}small{display:block;color:#888;font-size:13px;line-height:1.6;margin-top:16px}#status{margin-top:20px;color:#ddd;min-height:24px}#status.error{color:#ff9c9c}#success{display:none;text-align:center;padding:35px 20px}#success .check{font-size:56px;color:#b4e1c2}#invalid{display:none}body.done #setup{display:none}body.done #success{display:block}
+</style></head><body><main><div class="brand">X TV · LIVE CAPTIONS</div><div id="setup"><h1>Connect your TV</h1><p>Add captions to live streams with your own Groq account.</p><div id="invalid"><section><h2>Start on your TV</h2><p>Open Settings → Live captions on your TV, then scan its QR code. This page will connect to that TV.</p></section></div><div id="steps"><section><h2><span class="number">1</span>Get your Groq key</h2><p>Sign in or create your free account, then choose <strong>Create API Key</strong>. Copy the key and return to this page.</p><a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Open Groq ↗</a></section><section><h2><span class="number">2</span>Connect this TV</h2><form id="form"><label for="key">Paste your Groq API key</label><input id="key" type="password" autocomplete="off" spellcheck="false" autocapitalize="off" required placeholder="gsk_…"><button id="connect" type="submit">Connect my TV</button></form><div id="status" role="status" aria-live="polite"></div><small>Your key is checked directly with Groq, then encrypted for your TV. The pairing service cannot read it. The QR code expires after 10 minutes.</small></section><small>Live transcription sends the stream’s audio to Groq using your account’s allowance. You can disconnect from TV Settings at any time.</small></div></div><div id="success"><div class="check">✓</div><h1>You’re connected</h1><p>Your key has been sent to your TV. Leave the setup window open on the TV for a moment while it finishes connecting.</p><small>You can close this page.</small></div></main><script src="/nacl.js"></script><script>
+(function(){
+  var parameters=new URLSearchParams(location.hash.slice(1)), id=parameters.get('id'), secret=parameters.get('secret');
+  if(!/^[a-f0-9]{32}$/.test(id||'')||!/^[A-Za-z0-9_-]{43}$/.test(secret||'')){document.getElementById('invalid').style.display='block';document.getElementById('steps').style.display='none';return;}
+  function decode(value){return Uint8Array.from(atob(value.replace(/-/g,'+').replace(/_/g,'/')),function(c){return c.charCodeAt(0);});}
+  function encode(bytes){return btoa(String.fromCharCode.apply(null,bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');}
+  var keyBytes=decode(secret), pending=null;
+  document.getElementById('form').onsubmit=async function(e){
+    e.preventDefault(); var status=document.getElementById('status'), button=document.getElementById('connect'), input=document.getElementById('key');
+    var key=input.value.trim();status.className='';
+    if(!pending&&!/^gsk_[A-Za-z0-9_-]{20,256}$/.test(key)){status.textContent='Paste the full Groq key, starting with gsk_.';status.className='error';return;}
+    button.disabled=true;status.textContent='Checking your Groq connection…';
+    try{
+      if(!pending){
+        var response=await fetch('https://api.groq.com/openai/v1/models',{headers:{Authorization:'Bearer '+key},cache:'no-store'});
+        if(response.status===401||response.status===403)throw Error('Groq did not accept that key. Create a new key and try again.');
+        if(!response.ok)throw Error('Groq is unavailable right now. Try again shortly.');
+        var models=await response.json();
+        if(!models.data||!models.data.some(function(model){return model.id==='whisper-large-v3-turbo';}))throw Error('Enable Whisper Large V3 Turbo for this Groq project, then try again.');
+        var nonce=nacl.randomBytes(24), encrypted=nacl.secretbox(new TextEncoder().encode(key),nonce,keyBytes);
+        pending={nonce:encode(nonce),box:encode(encrypted)};input.value='';key='';
+      }
+      status.textContent='Connecting your TV…';
+      var transfer=await fetch('/api/pair/'+id,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pending)});
+      if(transfer.status===410)throw Error('This QR code expired. Open a new code on your TV and scan it.');
+      if(transfer.status===409)throw Error('This code was already used. Check your TV, or scan a new code.');
+      if(!transfer.ok)throw Error('Could not reach your TV. Try again.');
+      pending=null;keyBytes.fill(0);document.body.className='done';
+    }catch(error){status.textContent=error.message||'Could not connect. Try again.';status.className='error';button.disabled=false;}
+  };
+})();
+</script></body></html>

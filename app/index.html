@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="referrer" content="never">
 <title>X TV</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=1.6.0-captions-1">
 </head>
 <body>
 <div id="app" class="screen-browse">
@@ -118,6 +118,20 @@
     <div id="captions" aria-live="off"></div>
   </div>
 
+  <div id="groqSetup" role="dialog" aria-modal="true" aria-labelledby="groqTitle" hidden>
+    <div class="groq-scrim"></div>
+    <section class="groq-sheet">
+      <button type="button" id="groqClose" class="panel-close" aria-label="Close live captions setup"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      <div class="groq-eyebrow">LIVE CAPTIONS</div>
+      <h2 id="groqTitle">Connect with your phone</h2>
+      <p id="groqIntro">Use your own Groq account to add captions when a stream has none.</p>
+      <div id="groqPair"><div id="groqQr" aria-label="Scan this code to connect Groq"></div><div class="groq-steps"><p><b>1</b> Scan the code with your phone.</p><p><b>2</b> Sign into Groq and create a key.</p><p><b>3</b> Paste it on the setup page.</p><small>Your TV connects automatically. Your key stays on this device.</small></div></div>
+      <p id="groqStatus" role="status" aria-live="polite"></p>
+      <div id="groqDirect" hidden><label for="groqKey">Your Groq API key</label><input id="groqKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your key"><button type="button" id="groqSave" class="groq-primary">Connect</button></div>
+      <div class="groq-actions"><button type="button" id="groqManual">Enter a key instead</button><button type="button" id="groqRetry">New QR code</button><button type="button" id="groqDisconnect" hidden>Disconnect Groq</button></div>
+      <small class="groq-footnote">When live transcription is on, the stream’s audio is sent directly to Groq using your account’s allowance.</small>
+    </section>
+  </div>
   <div id="toast"></div>
 </div>
 <script src="config.js"></script>
@@ -125,6 +139,10 @@
 <script src="catalog.js"></script>
 <script src="broadcast.js"></script>
 <script src="captions.js"></script>
+<script src="vendor/nacl-fast.min.js"></script>
+<script src="vendor/qrcode.js"></script>
+<script src="groq.js?v=1.6.0-captions-1"></script>
+<script src="transcription.js"></script>
 <script src="vendor/hls.min.js"></script>
 <!-- Emoji artwork: Twemoji, Twitter and contributors, CC BY 4.0. See vendor/README.md. -->
 <script src="vendor/twemoji.min.js"></script>

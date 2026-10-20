@@ -37,6 +37,24 @@ function launch(database, local = {}, options = {}) {
   return { api: context.HelloFavourites, local, ready: new Promise(resolve => context.HelloFavourites.ready(resolve)) };
 }
 
+test('personal Groq credentials survive TV updates without appearing in settings or History', async () => {
+  const database = {}, app = launch(database);
+  await app.ready;
+  const key = 'gsk_' + 'unit-test'.repeat(6);
+  assert.equal(app.api.setSecret('groq', key), true);
+  await delay(15);
+  assert.equal(JSON.stringify(app.api.settings()).includes(key), false);
+  assert.equal(JSON.stringify(app.api.history()).includes(key), false);
+  const updated = launch(database);
+  await updated.ready;
+  assert.equal(updated.api.secret('groq'), key);
+  updated.api.setSecret('groq', '');
+  await delay(15);
+  const disconnected = launch(database);
+  await disconnected.ready;
+  assert.equal(disconnected.api.secret('groq'), '');
+});
+
 test('TV favourites migrate from localStorage into DB8', async () => {
   const database = {};
   const app = launch(database, { [key]: JSON.stringify(list('blueorigin')) });

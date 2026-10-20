@@ -12,6 +12,10 @@ These assets ship inside the TV package. Font and emoji rendering does not requi
 
 The parser uses DOM text nodes and local SVG paths. Dynamic text is escaped before insertion. Original Unicode is retained as image alt text. Code: MIT. Artwork: Copyright Twitter and contributors, CC BY 4.0, https://creativecommons.org/licenses/by/4.0/.
 
+## Phone pairing dependencies
+
+`nacl-fast.min.js` is TweetNaCl 1.0.3 from the pinned npm dependency; its public-domain license is in `nacl-LICENSE`. It encrypts phone-to-TV key transfers without requiring WebCrypto's newer APIs on older TVs. `qrcode.js` is qrcode-generator 2.0.4 by Kazuhiko Arase, under the MIT license in its source header. Both ship locally with the TV app; no remote JavaScript is loaded by the pairing page.
+
 ## Noto fonts
 
 The static TrueType files in `../fonts/` are unmodified copies from https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf: NotoSans/NotoSans-Regular.ttf, NotoSans/NotoSans-SemiBold.ttf, NotoSansMath/NotoSansMath-Regular.ttf, and NotoSansSymbols2/NotoSansSymbols2-Regular.ttf. The archived repository's `LICENSE` is copied to `../fonts/OFL.txt` (SIL Open Font License 1.1).

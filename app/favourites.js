@@ -4,6 +4,7 @@
   var POSITION_KEY = 'hellotv.positions';
   var HISTORY_KEY = 'hellotv.history';
   var SETTINGS_KEY = 'hellotv.settings';
+  var CREDENTIALS_KEY = 'hellotv.credentials';
   var KIND = 'com.example.hellotv.favourites:1';
   var cache = null;
   var record = null;
@@ -13,6 +14,8 @@
   var positions = {};
   var history = {};
   var settings = {};
+  var credentials = {};
+  var credentialsChanged = false;
   var busy = false;
   var queued = false;
   var waiters = [];
@@ -22,6 +25,8 @@
   try { positions = JSON.parse(localStorage.getItem(POSITION_KEY) || '{}') || {}; } catch (e2) {}
   try { history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '{}') || {}; } catch (e3) {}
   try { settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || '{}') || {}; } catch (e4) {}
+  try { credentials = JSON.parse(localStorage.getItem(CREDENTIALS_KEY) || '{}') || {}; } catch (e5) {}
+  if (typeof credentials !== 'object' || Array.isArray(credentials)) credentials = {};
   if (typeof positions !== 'object' || Array.isArray(positions)) positions = {};
   if (typeof history !== 'object' || Array.isArray(history)) history = {};
   if (typeof settings !== 'object' || Array.isArray(settings)) settings = {};
@@ -35,6 +40,7 @@
       localStorage.setItem(POSITION_KEY, JSON.stringify(positions));
       localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
       localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+      localStorage.setItem(CREDENTIALS_KEY, JSON.stringify(credentials));
       return true;
     }
     catch (e) { return false; }
@@ -71,7 +77,7 @@
     if (!dbReady || busy || !queued) return;
     queued = false;
     busy = true;
-    var object = { _kind: KIND, favourites: cache, positions: positions, history: history, settings: settings };
+    var object = { _kind: KIND, favourites: cache, positions: positions, history: history, settings: settings, credentials: credentials };
     if (record) { object._id = record.id; object._rev = record.rev; }
     call('put', { objects: [object] }, function (error, result) {
       busy = false;
@@ -154,6 +160,18 @@
     if (!mirror() && ready && !dbReady) report();
     flush();
   };
+  // Device credentials are kept out of settings, History, catalogue items and exports.
+  api.secret = function (name) { return typeof credentials[name] === 'string' ? credentials[name] : ''; };
+  api.setSecret = function (name, value) {
+    if (value) credentials[name] = String(value);
+    else delete credentials[name];
+    credentialsChanged = true;
+    queued = true;
+    var saved = mirror();
+    if (!saved && ready && !dbReady) report();
+    flush();
+    return saved || dbReady;
+  };
   api.savePosition = function (id, time, duration) {
     if (!id || !isFinite(time) || !isFinite(duration) || duration <= 0) return;
     var completed = time > 0 && duration - time < Math.min(3, duration * 0.05);
@@ -174,6 +192,7 @@
       var saved = result.results && result.results[0];
       if (saved) {
         record = { id: saved._id, rev: saved._rev };
+        if (!credentialsChanged && saved.credentials && typeof saved.credentials === 'object' && !Array.isArray(saved.credentials)) credentials = saved.credentials;
         if (!changed && valid(saved.favourites)) cache = saved.favourites;
         var remote = saved.positions || {};
         for (var id in remote) {
@@ -193,7 +212,7 @@
         if (remoteSettings && typeof remoteSettings === 'object' && (remoteSettings.at || 0) > (settings.at || 0)) settings = remoteSettings;
         else if ((settings.at || 0) > ((remoteSettings && remoteSettings.at) || 0)) queued = true;
         mirror();
-      } else if (cache || Object.keys(positions).length || Object.keys(history).length || settings.at) queued = true;
+      } else if (cache || Object.keys(positions).length || Object.keys(history).length || settings.at || Object.keys(credentials).length) queued = true;
       finishInit();
     });
   });

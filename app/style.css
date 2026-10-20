@@ -293,6 +293,34 @@ html.artwork #backdrop { display: block; }
 .setting.focused.on .switch { background: #000; }
 .setting.focused.on .switch:after { background: #fff; }
 .settings-foot { position: absolute; left: 56px; right: 56px; bottom: 56px; font-size: 18px; line-height: 28px; color: var(--text-3); }
+.setting-arrow { position: absolute; right: 44px; top: 50%; margin-top: -25px; font-size: 46px; line-height: 50px; }
+
+/* Phone connection stays above Settings and playback, without transforming the video. */
+#groqSetup { display: none; position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; z-index: 60; }
+#groqSetup.on { display: block; }
+.groq-scrim { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); }
+.groq-sheet { position: absolute; top: 100px; left: 360px; width: 1200px; min-height: 780px; max-height: 900px; overflow-y: auto; padding: 62px 70px 44px; border: 1px solid #333; border-radius: 30px; background: #101010; color: #fff; }
+#groqClose { position: absolute; top: 34px; right: 34px; }
+.groq-eyebrow { margin-bottom: 16px; color: #888; font-size: 17px; letter-spacing: 2px; font-weight: 600; }
+.groq-sheet h2 { font-size: 46px; line-height: 60px; font-weight: 600; letter-spacing: -1px; }
+#groqIntro { margin-top: 10px; color: #aaa; font-size: 24px; line-height: 36px; }
+#groqPair { display: flex; align-items: center; margin: 36px 0 20px; }
+#groqQr { flex: none; display: flex; align-items: center; justify-content: center; width: 270px; height: 270px; padding: 12px; border-radius: 18px; background: #fff; color: #111; }
+#groqQr svg { display: block; width: 100%; height: 100%; }
+.groq-steps { margin-left: 44px; font-size: 25px; line-height: 38px; }
+.groq-steps p { margin: 0 0 20px; }
+.groq-steps b { display: inline-block; margin-right: 12px; width: 34px; height: 34px; border-radius: 50%; background: #2c2c2c; text-align: center; font-size: 20px; line-height: 34px; }
+.groq-steps small { display: block; max-width: 580px; color: #999; font-size: 20px; line-height: 30px; }
+#groqStatus { margin: 22px 0; font-size: 22px; line-height: 34px; color: #ccc; }
+#groqStatus.error { color: #ffaaaa; }
+.groq-actions button, #groqSave { margin: 0 14px 12px 0; padding: 14px 24px; border: 1px solid #444; border-radius: 26px; background: #252525; color: #fff; font-size: 22px; }
+.groq-actions button:focus, #groqSave:focus, #groqSave.groq-primary { background: #fff; color: #111; outline: 2px solid #777; outline-offset: 4px; }
+#groqDirect label { display: block; margin: 22px 0 10px; font-size: 21px; }
+#groqKey { width: 760px; margin: 0 20px 24px 0; padding: 14px 20px; border: 1px solid #666; border-radius: 14px; background: #080808; color: #fff; font-size: 24px; }
+#groqKey:focus { outline: 3px solid #fff; outline-offset: 3px; }
+.groq-footnote { display: block; margin-top: 14px; color: #777; font-size: 18px; line-height: 28px; }
+.groq-wait { width: 46px; height: 46px; border: 4px solid #ddd; border-top-color: #111; border-radius: 50%; animation: spin 1s linear infinite; }
+[hidden] { display: none !important; }
 
 
 /* Player */

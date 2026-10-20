@@ -106,6 +106,9 @@
     { id: 'artwork', name: 'Background artwork', desc: 'Show the selected video’s picture behind the page title.' }
   ];
   var prefs = { motion: true, artwork: true, captions: '' };
+  state.aiCaptions = false;
+  state.aiStatus = '';
+  state.transcriber = null;
   // Older TV browsers (webOS 4.5 is Chromium 53 on a slow TV chip) get the light variants of
   // the most expensive effects; measured on the TV, the full versions ran at 10-25 fps.
   var chromeVersion = /Chrome\/(\d+)/.exec(navigator.userAgent || '');
@@ -319,7 +322,7 @@
   // Captions: tracks come from the video's HLS master; the app draws the cues itself.
   function paintCaptionText() {
     var video = document.getElementById('video');
-    var text = state.captionTrack >= 0 && window.HelloCaptions ? HelloCaptions.at(state.captionCues, video.currentTime) : '';
+    var text = (state.captionTrack >= 0 || state.aiCaptions) && window.HelloCaptions ? HelloCaptions.at(state.captionCues, video.currentTime) : '';
     if (text === state.captionShown) return;
     state.captionShown = text;
     document.getElementById('captions').innerHTML = text ? '<span>' + esc(text).replace(/\n/g, '<br>') + '</span>' : '';
@@ -327,14 +330,17 @@
 
   function paintCaptionsButton() {
     var button = document.getElementById('captionsButton');
-    button.setAttribute('aria-pressed', state.captionTrack >= 0 ? 'true' : 'false');
-    button.classList.toggle('unavailable', !!state.captionTracks && !state.captionTracks.length);
+    button.setAttribute('aria-pressed', state.captionTrack >= 0 || state.aiCaptions ? 'true' : 'false');
+    button.classList.toggle('unavailable', !!state.captionTracks && !state.captionTracks.length && !(window.HelloGroq && HelloGroq.key()));
   }
 
   function resetCaptions(item) {
     state.captionGen += 1;
     if (state.captionRequest) state.captionRequest.abort();
     state.captionRequest = null;
+    state.aiCaptions = false;
+    state.aiStatus = '';
+    if (state.transcriber) state.transcriber.enable(false);
     var source = item && !item.live && window.HelloCaptions ? item.captionSource || item.masterUrl : '';
     state.captionTracks = source ? null : [];
     state.captionTrack = -1;
@@ -342,12 +348,17 @@
     state.captionLoading = false;
     paintCaptionText();
     paintCaptionsButton();
-    if (!source) return;
+    if (!source) {
+      if (item && (prefs.captions === 'ai' || prefs.captions === 'auto') && window.HelloGroq && HelloGroq.key()) chooseAiCaption(false);
+      return;
+    }
     var gen = state.captionGen;
     state.captionRequest = HelloCaptions.tracks(source, function (error, tracks) {
       if (gen !== state.captionGen) return;
       state.captionRequest = null;
       state.captionTracks = tracks || [];
+      if (prefs.captions === 'auto' && state.captionTracks.length) chooseCaption(0, false);
+      else if ((prefs.captions === 'ai' || prefs.captions === 'auto') && window.HelloGroq && HelloGroq.key()) chooseAiCaption(false);
       for (var i = 0; i < state.captionTracks.length && prefs.captions; i++) {
         var track = state.captionTracks[i];
         if ((track.language || track.name) === prefs.captions) { chooseCaption(i, false); break; }
@@ -358,6 +369,9 @@
   }
 
   function chooseCaption(index, remember) {
+    state.aiCaptions = false;
+    state.aiStatus = '';
+    if (state.transcriber) state.transcriber.enable(false);
     var tracks = state.captionTracks || [];
     var track = tracks[index];
     state.captionGen += 1;
@@ -391,31 +405,64 @@
     });
   }
 
-  function paintCaptionsMenu() {
+  function chooseAiCaption(remember) {
+    if (!window.HelloGroq || !HelloGroq.key()) { HelloGroq.open(); return; }
+    state.captionGen += 1;
+    if (state.captionRequest) state.captionRequest.abort();
+    state.captionRequest = null;
+    state.captionTrack = -1;
+    state.captionLoading = false;
+    state.captionCues = [];
+    state.aiCaptions = true;
+    if (remember) {
+      prefs.captions = 'ai';
+      HelloFavourites.setSetting('captions', 'ai');
+    }
+    state.aiStatus = state.transcriber ? 'Listening for speech…' : 'Live transcription is available for supported HLS streams.';
+    if (state.transcriber) state.transcriber.enable(true);
+    paintCaptionText(); paintCaptionsButton();
+  }
+
+  function captionOptions() {
     var tracks = state.captionTracks || [];
     var options = [{ name: 'Off', index: -1 }];
     for (var i = 0; i < tracks.length; i++) options.push({ name: tracks[i].name, index: i });
+    options.push({ name: window.HelloGroq && HelloGroq.key() ? 'Live transcription · Groq' : 'Set up live transcription', index: -2 });
+    return options;
+  }
+
+  function selectCaptionOption(index) {
+    var option = captionOptions()[index];
+    if (!option) return;
+    if (option.index === -2) chooseAiCaption(true);
+    else chooseCaption(option.index, true);
+    closeCaptionsMenu();
+  }
+
+  function paintCaptionsMenu() {
+    var tracks = state.captionTracks || [];
+    var options = captionOptions();
     state.captionsIndex = Math.max(0, Math.min(state.captionsIndex, options.length - 1));
     var html = '<div class="quality-note">Captions</div>';
     for (var o = 0; o < options.length; o++) {
-      var on = options[o].index === state.captionTrack;
+      var on = state.aiCaptions ? options[o].index === -2 : options[o].index === state.captionTrack;
       html += '<button type="button" class="quality-option' + (state.captionsIndex === o ? ' focused' : '') + '" data-i="' + o + '"' +
         (on ? ' aria-current="true"' : '') + '>' + esc(options[o].name) + (on ? (state.captionLoading ? ' · Loading' : CHECK) : '') + '</button>';
     }
     if (!state.captionTracks) html += '<div class="quality-note">Checking for captions…</div>';
     else if (!tracks.length) html += '<div class="quality-note">This video has no captions.</div>';
+    if (state.aiCaptions && state.aiStatus) html += '<div class="quality-note">' + esc(state.aiStatus) + '</div>';
     var menu = document.getElementById('captionsMenu');
     menu.innerHTML = html;
     menu.className = 'on';
     var buttons = menu.querySelectorAll('.quality-option');
     for (var b = 0; b < buttons.length; b++) {
-      (function (button, option) {
+      (function (button, index) {
         button.onclick = function (e) {
           e.stopPropagation();
-          chooseCaption(option.index, true);
-          closeCaptionsMenu();
+          selectCaptionOption(index);
         };
-      })(buttons[b], options[b]);
+      })(buttons[b], b);
     }
   }
 
@@ -426,7 +473,7 @@
     state.captionsOpen = true;
     state.playerZone = 'controls';
     state.playerAction = 1;
-    state.captionsIndex = state.captionTrack + 1;
+    state.captionsIndex = state.aiCaptions ? captionOptions().length - 1 : state.captionTrack + 1;
     paintPlayerActions();
     showControls(true);
     paintCaptionsMenu();
@@ -1199,6 +1246,7 @@
   }
 
   function stopVideo(video) {
+    if (state.transcriber) { state.transcriber.stop(); state.transcriber = null; }
     clearTimeout(state.recoveryTimer);
     if (state.hls) {
       var hls = state.hls;
@@ -1750,6 +1798,20 @@
         fragLoadPolicy: hlsLoadPolicy(30000)
       });
       state.hls = hls;
+      if (window.HelloTranscription) {
+        state.transcriber = HelloTranscription.attach(hls, video, {
+          onCues: function (cues) {
+            if (state.hls !== hls || !state.aiCaptions) return;
+            state.captionCues = cues; paintCaptionText();
+          },
+          onStatus: function (text) {
+            if (state.hls !== hls || !state.aiCaptions) return;
+            state.aiStatus = text;
+            if (state.captionsOpen) paintCaptionsMenu();
+          }
+        });
+        if (state.aiCaptions) state.transcriber.enable(true);
+      }
       hls.on(Hls.Events.ERROR, function (event, data) {
         var status = data.response && data.response.code;
         var unavailable = status === 403 || status === 404 || status === 410;
@@ -1908,6 +1970,7 @@
         '<span class="setting-name">' + esc(SETTINGS[i].name) + '</span>' +
         '<span class="setting-desc">' + esc(SETTINGS[i].desc) + '</span><span class="switch" aria-hidden="true"></span></button>';
     }
+    html += '<button type="button" class="setting groq-setting"><span class="setting-name">Live captions</span><span class="setting-desc" id="groqSettingStatus">Connect your own Groq account</span><span class="setting-arrow" aria-hidden="true">›</span></button>';
     var list = document.getElementById('settingsList');
     list.innerHTML = html;
     var rows = list.querySelectorAll('.setting');
@@ -1931,10 +1994,12 @@
   function paintSettings() {
     var rows = document.querySelectorAll('#settingsList .setting');
     for (var i = 0; i < rows.length; i++) {
-      var on = !!prefs[SETTINGS[i].id];
-      rows[i].className = 'setting' + (on ? ' on' : '') + (i === state.settingsIndex ? ' focused' : '');
-      rows[i].setAttribute('aria-checked', on ? 'true' : 'false');
+      var on = i < SETTINGS.length && !!prefs[SETTINGS[i].id];
+      rows[i].className = 'setting' + (i === SETTINGS.length ? ' groq-setting' : '') + (on ? ' on' : '') + (i === state.settingsIndex ? ' focused' : '');
+      if (i < SETTINGS.length) rows[i].setAttribute('aria-checked', on ? 'true' : 'false');
     }
+    var groqStatus = document.getElementById('groqSettingStatus');
+    if (groqStatus) groqStatus.textContent = window.HelloGroq && HelloGroq.key() ? 'Connected · Manage your Groq account' : 'Add captions to streams with your own Groq account';
   }
 
   function openSettings() {
@@ -1950,6 +2015,7 @@
   }
 
   function toggleSetting(index) {
+    if (index === SETTINGS.length) { HelloGroq.open(); return; }
     var id = SETTINGS[index].id;
     prefs[id] = !prefs[id];
     if (window.HelloFavourites && HelloFavourites.setSetting) HelloFavourites.setSetting(id, prefs[id]);
@@ -1963,7 +2029,7 @@
   function onSettingsKey(code) {
     if (code === KEY.BACK || code === KEY.LEFT) closeSettings();
     else if (code === KEY.UP) state.settingsIndex = Math.max(0, state.settingsIndex - 1);
-    else if (code === KEY.DOWN) state.settingsIndex = Math.min(SETTINGS.length - 1, state.settingsIndex + 1);
+    else if (code === KEY.DOWN) state.settingsIndex = Math.min(SETTINGS.length, state.settingsIndex + 1);
     else if (code === KEY.ENTER) toggleSetting(state.settingsIndex);
     else return code === KEY.RIGHT;
     if (state.settingsOpen) paintSettings();
@@ -2163,13 +2229,12 @@
       return true;
     }
     if (state.captionsOpen) {
-      var count = (state.captionTracks || []).length + 1;
+      var count = captionOptions().length;
       if (code === KEY.LEFT) closeCaptionsMenu();
       else if (code === KEY.UP) { state.captionsIndex = Math.max(0, state.captionsIndex - 1); paintCaptionsMenu(); }
       else if (code === KEY.DOWN) { state.captionsIndex = Math.min(count - 1, state.captionsIndex + 1); paintCaptionsMenu(); }
       else if (code === KEY.ENTER) {
-        chooseCaption(state.captionsIndex - 1, true);
-        closeCaptionsMenu();
+        selectCaptionOption(state.captionsIndex);
       }
       return true;
     }
@@ -2393,6 +2458,7 @@
   });
 
   document.addEventListener('keydown', function (e) {
+    if (window.HelloGroq && HelloGroq.isOpen()) { HelloGroq.handleKey(e); return; }
     if (state.screen === 'search' && !state.settingsOpen && state.zone !== 'nav' && (e.keyCode === 8 || e.key === '_' || e.key === '@')) {
       pressKey(e.keyCode === 8 ? '⌫' : e.key);
       e.preventDefault();
@@ -2413,6 +2479,16 @@
 
   loadPrefs();
   buildSettings();
+  if (window.HelloGroq) HelloGroq.onChange = function (connected) {
+    if (connected) {
+      prefs.captions = 'auto'; HelloFavourites.setSetting('captions', 'auto');
+      if (state.playing) chooseAiCaption(false);
+    } else {
+      if (state.aiCaptions) chooseCaption(-1, false);
+      if (prefs.captions === 'ai' || prefs.captions === 'auto') { prefs.captions = ''; HelloFavourites.setSetting('captions', ''); }
+    }
+    paintSettings();
+  };
   window.addEventListener('resize', fitToWindow);
   window.addEventListener('pagehide', function () { saveResume(true); });
   document.addEventListener('visibilitychange', function () { if (document.hidden) saveResume(true); });
