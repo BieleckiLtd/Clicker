@@ -170,6 +170,17 @@ html.artwork #backdrop { display: block; }
 .home-chip.focused, .chip.focused { box-shadow: 0 0 0 3px #000, 0 0 0 6px #fff; }
 .home-chip.focused:not(.selected), .chip.focused:not(.selected) { background: var(--fill-2); color: #fff; }
 .home-chip img { -webkit-flex: none; flex: none; width: 32px; height: 32px; margin: 0 12px 0 -10px; border-radius: 16px; object-fit: cover; }
+.home-chip[draggable="true"] { position: relative; cursor: grab; }
+.home-chip[draggable="true"] img { pointer-events: none; -webkit-user-drag: none; }
+.home-chip.dragging { opacity: 0.4; cursor: grabbing; }
+.home-chip.drop-before:before, .home-chip.drop-after:after { content: ''; position: absolute; top: 6px; bottom: 6px; width: 4px; border-radius: 2px; background: #fff; }
+.home-chip.drop-before:before { left: -8px; }
+.home-chip.drop-after:after { right: -8px; }
+#homeChips.reordering .home-chip.focused { box-shadow: none; }
+#homeChips.reordering .home-chip, #homeChips.reordering .chip-title { transition: none; }
+.channel-drag-preview { position: fixed; left: -1000px; top: 0; z-index: 1000; display: flex; align-items: center; gap: 10px; max-width: 240px; height: 44px; padding: 0 14px 0 8px; border: 1px solid rgba(255,255,255,0.3); border-radius: 24px; background: #242424; color: #fff; box-shadow: 0 6px 20px rgba(0,0,0,0.4); font: 600 15px "TV Sans", sans-serif; pointer-events: none; }
+.channel-drag-preview img { flex: none; width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.channel-drag-preview span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .home-chip.channel-compact { padding: 0 12px; }
 .home-chip.channel-compact .home-avatar { margin: 0; }
 .home-chip.channel-compact .chip-title { display: block; -webkit-flex: none; flex: none; max-width: 0; height: 56px; margin-left: 0; overflow: hidden; opacity: 0; transform: translateX(-6px); }

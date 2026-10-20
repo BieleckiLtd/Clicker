@@ -462,6 +462,87 @@ test('Hot ranks recent popularity, keeps older live streams, and leaves Videos c
   assert.equal(await page.locator('#rows .badge.live').count(), 0);
 });
 
+test('Home channels drag before and after each other, preserve selection and retain their order', async t => {
+  const { page } = await fixture(t);
+  await page.locator('[data-nav="home"]').click();
+  const channels = () => page.locator('#homeChips [data-channel]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-channel')));
+  const channel = handle => page.locator('#homeChips [data-channel="' + handle + '"]');
+  await channel('spacex').click();
+  const title = await page.locator('#homeTitle').innerText();
+  const cards = await page.locator('#rows .ttl').allTextContents();
+  const station = await channel('space_station').boundingBox();
+  await channel('spacex').dragTo(channel('space_station'), { targetPosition: { x: station.width - 4, y: 28 } });
+  assert.deepEqual(await channels(), ['nasa', 'nasakennedy', 'space_station', 'spacex']);
+  assert.equal(await page.locator('#homeTitle').innerText(), title);
+  assert.deepEqual(await page.locator('#rows .ttl').allTextContents(), cards);
+  assert.equal(await page.locator('#homeChips .selected').getAttribute('data-channel'), 'spacex');
+  await channel('space_station').dragTo(channel('nasa'), { targetPosition: { x: 4, y: 28 } });
+  const expected = ['space_station', 'nasa', 'nasakennedy', 'spacex'];
+  assert.deepEqual(await channels(), expected);
+  assert.deepEqual(await page.evaluate(() => HelloFavourites.get().map(item => item.handle.toLowerCase())), expected);
+  await page.locator('[data-nav="refresh"]').click();
+  await page.waitForTimeout(100);
+  assert.deepEqual(await channels(), expected);
+  await page.reload();
+  await channel('spacex').waitFor();
+  assert.deepEqual(await channels(), expected);
+});
+
+test('dragging channels onto fixed filters or themselves leaves the saved order intact', async t => {
+  const { page } = await fixture(t);
+  await page.locator('[data-nav="home"]').click();
+  await page.evaluate(() => HelloFavourites.set(['SpaceX', 'NASA', 'NASAKennedy', 'Space_Station', 'alpha', 'beta', 'gamma'].map(handle => ({ handle, name: handle }))));
+  await page.locator('[data-nav="refresh"]').click();
+  await page.locator('#homeChips [data-channel="gamma"]').waitFor();
+  const channel = handle => page.locator('#homeChips [data-channel="' + handle + '"]');
+  const order = () => page.locator('#homeChips [data-channel]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-channel')));
+  const original = await order();
+  await channel('spacex').dragTo(page.locator('#homeChips .home-chip[aria-label="Live"]'));
+  assert.deepEqual(await order(), original);
+  await channel('spacex').dragTo(channel('spacex'));
+  assert.deepEqual(await order(), original);
+  await channel('gamma').dragTo(channel('spacex'), { targetPosition: { x: 4, y: 28 } });
+  assert.deepEqual(await order(), ['gamma'].concat(original.slice(0, -1)));
+  assert.equal(await page.locator('#homeChips [draggable="true"]').count(), 7);
+  assert.equal(await page.locator('#homeChips .dragging, #homeChips .drop-before, #homeChips .drop-after').count(), 0);
+});
+
+test('dragging an avatar on a scaled PC preview uses a compact native badge', async t => {
+  const { page } = await fixture(t);
+  await page.setViewportSize({ width: 960, height: 700 });
+  await page.locator('[data-nav="home"]').click();
+  const avatar = page.locator('#homeChips [data-channel="spacex"] .home-avatar');
+  assert.equal(await avatar.getAttribute('draggable'), 'false');
+  await page.evaluate(() => {
+    const original = DataTransfer.prototype.setDragImage;
+    DataTransfer.prototype.setDragImage = function (node, x, y) {
+      const image = node.querySelector('img').getBoundingClientRect();
+      const badge = node.getBoundingClientRect();
+      window.dragBadge = { width: badge.width, height: badge.height, imageWidth: image.width, imageHeight: image.height, text: node.textContent };
+      return original.call(this, node, x, y);
+    };
+  });
+  const from = await avatar.boundingBox();
+  const to = await page.locator('#homeChips [data-channel="nasa"]').boundingBox();
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2 + 12, from.y + from.height / 2, { steps: 4 });
+  await page.mouse.move(to.x + to.width - 3, to.y + to.height / 2, { steps: 5 });
+  const badge = await page.evaluate(() => window.dragBadge);
+  assert.equal(badge.height, 44, 'badge stays small at the PC viewport scale');
+  assert.ok(badge.width <= 240);
+  assert.equal(badge.text, 'SPACEX');
+  assert.equal(badge.imageWidth, 28);
+  assert.equal(badge.imageHeight, 28);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
+  await page.locator('.channel-drag-preview').waitFor({ state: 'detached' });
+  assert.equal(await page.locator('#homeChips .dragging, #homeChips .drop-after').count(), 0);
+  assert.equal(await page.locator('#homeChips .home-chip[style*="width"]').count(), 0);
+  assert.deepEqual(await page.locator('#homeChips [data-channel]').evaluateAll(nodes => nodes.map(node => node.getAttribute('data-channel'))),
+    ['spacex', 'nasa', 'nasakennedy', 'space_station']);
+});
+
 test('empty Hot explains how to browse older content without hiding saved channels', async t => {
   const { page } = await fixture(t, { olderHome: true });
   await page.locator('[data-nav="home"]').click();

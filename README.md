@@ -50,6 +50,8 @@ npm start
 
 Open http://127.0.0.1:8080. The preview server serves development files; the installed TV package works independently. A computer keyboard can type search queries; Backspace deletes and Escape goes back.
 
+Drag a saved channel filter on Home before or after another channel to rearrange it. The insertion marker shows where it will land, and the order is saved automatically. Hot, Live and Videos stay at the start.
+
 ```powershell
 npm test
 npm run package

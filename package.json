@@ -5,7 +5,7 @@
     "start": "http-server app -a 127.0.0.1 -p 8080 -c-1",
     "test": "node --test --test-concurrency=1 tests/*.test.cjs",
     "package": "npx -y -p @webos-tools/cli ares-package app -o dist",
-    "tv:install": "npx -y -p @webos-tools/cli ares-install -d mytv dist/com.example.hellotv_1.6.0_all.ipk",
+    "tv:install": "npx -y -p @webos-tools/cli ares-install -d mytv dist/com.example.hellotv_1.7.0_all.ipk",
     "tv:launch": "npx -y -p @webos-tools/cli ares-launch -d mytv com.example.hellotv"
   },
   "devDependencies": {

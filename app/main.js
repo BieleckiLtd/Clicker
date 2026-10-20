@@ -115,6 +115,9 @@
   var lite = !!chromeVersion && parseInt(chromeVersion[1], 10) < 80;
   var searchPainted = null;
   var homeChipsPainted = null;
+  var channelDrag = null;
+  var channelDragPreview = null;
+  var channelDragClickUntil = 0;
   var toastTimer = null;
   var shownTitle = null;
   var rowsPainted = null;
@@ -739,7 +742,109 @@
     }
   }
 
+  function paintChannelDrag() {
+    var chips = document.querySelectorAll('#homeChips [data-channel]');
+    for (var i = 0; i < chips.length; i++) {
+      var handle = chips[i].getAttribute('data-channel');
+      if (!channelDrag) chips[i].style.width = '';
+      chips[i].classList.toggle('dragging', !!channelDrag && handle === channelDrag.handle);
+      chips[i].classList.toggle('drop-before', !!channelDrag && handle === channelDrag.target && !channelDrag.after);
+      chips[i].classList.toggle('drop-after', !!channelDrag && handle === channelDrag.target && channelDrag.after);
+    }
+    document.getElementById('homeChips').classList.toggle('reordering', !!channelDrag);
+  }
+
+  function clearChannelDragPreview() {
+    if (channelDragPreview) channelDragPreview.parentNode.removeChild(channelDragPreview);
+    channelDragPreview = null;
+  }
+
+  function startChannelDrag(e, btn) {
+    var chips = document.querySelectorAll('#homeChips [data-channel]');
+    for (var i = 0; i < chips.length; i++) chips[i].style.width = chips[i].offsetWidth + 'px';
+    channelDrag = { handle: btn.getAttribute('data-channel'), target: null, after: false };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', channelDrag.handle);
+    // Use a small badge, even when the drag starts on a high resolution avatar.
+    clearChannelDragPreview();
+    channelDragPreview = document.createElement('div');
+    channelDragPreview.className = 'channel-drag-preview';
+    channelDragPreview.setAttribute('aria-hidden', 'true');
+    var avatar = btn.querySelector('.home-avatar');
+    if (avatar) channelDragPreview.appendChild(avatar.cloneNode(false));
+    var label = document.createElement('span');
+    label.textContent = btn.getAttribute('aria-label');
+    channelDragPreview.appendChild(label);
+    // Keep the preview outside the scaled TV canvas so its size stays readable on PC.
+    document.documentElement.appendChild(channelDragPreview);
+    e.dataTransfer.setDragImage(channelDragPreview, 20, 22);
+    // The browser captures the badge at the end of dragstart.
+    setTimeout(clearChannelDragPreview, 0);
+    paintChannelDrag();
+  }
+
+  function endChannelDrag() {
+    clearChannelDragPreview();
+    channelDrag = null;
+    channelDragClickUntil = Date.now() + 300;
+    paintChannelDrag();
+    renderBrowseQuietly();
+  }
+
+  function dragOverChannels(e) {
+    if (!channelDrag || state.screen !== 'browse' || state.historyOpen) return;
+    var host = document.getElementById('homeChips');
+    var chips = host.querySelectorAll('[data-channel]');
+    if (!chips.length) return;
+    var first = chips[0].getBoundingClientRect();
+    channelDrag.target = null;
+    if (e.clientX >= first.left - 6) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      var bounds = host.getBoundingClientRect();
+      if (e.clientX > bounds.right - 48) host.scrollLeft += 24;
+      else if (e.clientX < bounds.left + 48) host.scrollLeft -= 24;
+      var target = chips[chips.length - 1];
+      for (var i = 0; i < chips.length; i++) {
+        if (e.clientX < chips[i].getBoundingClientRect().right + 6) { target = chips[i]; break; }
+      }
+      var rect = target.getBoundingClientRect();
+      var handle = target.getAttribute('data-channel');
+      if (handle !== channelDrag.handle) {
+        channelDrag.target = handle;
+        channelDrag.after = e.clientX >= rect.left + rect.width / 2;
+      }
+    }
+    paintChannelDrag();
+  }
+
+  function dropChannel(e) {
+    if (!channelDrag) return;
+    e.preventDefault();
+    var options = homeOptions();
+    var selected = options[state.browseChipIndex].id;
+    var moved = 'channel:' + channelDrag.handle;
+    var data = channelDrag.target && HelloCatalog.reorderFavourite(channelDrag.handle, channelDrag.target, channelDrag.after);
+    clearChannelDragPreview();
+    channelDrag = null;
+    channelDragClickUntil = Date.now() + 300;
+    paintChannelDrag();
+    if (data) {
+      state.data = data;
+      options = homeOptions();
+      for (var i = 0; i < options.length; i++) {
+        if (options[i].id === selected) state.browseChipIndex = i;
+        if (options[i].id === moved) state.browseChipFocus = i;
+      }
+      state.zone = 'homechips';
+      showToast('Channel order saved');
+    }
+    renderBrowse();
+  }
+
   function renderBrowse() {
+    // Keep the dragged DOM node alive while background broadcast details arrive.
+    if (channelDrag) return;
     var options = homeOptions();
     if (state.browseChipIndex >= options.length) state.browseChipIndex = 0;
     state.browseChipFocus = Math.min(state.browseChipFocus, options.length - 1);
@@ -771,13 +876,19 @@
     for (var p = 0; p < options.length; p++) {
       var compact = options.length - 3 > 4 && !!options[p].row;
       html += '<button type="button" class="home-chip" data-i="' + p + '" data-compact="' + (compact ? '1' : '0') +
-        '" aria-label="' + esc(options[p].title) + '">' +
+        (options[p].row ? '" draggable="true" data-channel="' + esc(options[p].row.id) + '" title="Drag to rearrange channel"' : '"') +
+        ' aria-label="' + esc(options[p].title) + '">' +
         (options[p].id === 'live' ? '<i class="live-dot' + (liveNow ? ' on' : '') + '" aria-hidden="true"></i>' : '') +
-        (options[p].avatar || compact ? '<img class="home-avatar" alt="" src="' + esc(assetUrl(options[p].avatar || 'logo.png')) + '">' : '') +
+        (options[p].avatar || compact ? '<img class="home-avatar" draggable="false" alt="" src="' + esc(assetUrl(options[p].avatar || 'logo.png')) + '">' : '') +
         '<span class="chip-title">' + (compact ? '<span class="chip-title-text">' : '') + esc(options[p].title) +
         (compact ? '</span>' : '') + '</span></button>';
     }
     var chipHost = document.getElementById('homeChips');
+    chipHost.ondragover = dragOverChannels;
+    chipHost.ondragleave = function (e) {
+      if (channelDrag && !chipHost.contains(e.relatedTarget)) { channelDrag.target = null; paintChannelDrag(); }
+    };
+    chipHost.ondrop = dropChannel;
     if (homeChipsPainted !== html) {
       homeChipsPainted = html;
       chipHost.innerHTML = html;
@@ -792,15 +903,22 @@
             if (e.propertyName === 'max-width' && state.zone === 'homechips' && state.browseChipFocus === index) paintFocus();
           });
           btn.onmousemove = function () {
-            if (state.screen !== 'browse') return;
+            if (state.screen !== 'browse' || channelDrag) return;
             state.zone = 'homechips';
             state.browseChipFocus = index;
             paintFocus();
           };
           btn.onclick = function () {
+            if (channelDrag || Date.now() < channelDragClickUntil) return;
             state.zone = 'homechips';
             chooseHomeFilter(index);
           };
+          if (btn.hasAttribute('data-channel')) {
+            btn.ondragstart = function (e) {
+              startChannelDrag(e, btn);
+            };
+            btn.ondragend = endChannelDrag;
+          }
         })(chips[n], n);
       }
     }

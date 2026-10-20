@@ -102,6 +102,25 @@
     return String(query || '').replace(/^\s+|\s+$/g, '').replace(/^@+/, '');
   }
 
+  function reorderFavourite(handle, target, after) {
+    var list = favourites().slice();
+    var from = -1;
+    var to = -1;
+    for (var i = 0; i < list.length; i++) {
+      var key = String(list[i].handle || '').toLowerCase();
+      if (key === String(handle || '').toLowerCase()) from = i;
+      if (key === String(target || '').toLowerCase()) to = i;
+    }
+    if (from < 0 || to < 0 || from === to) return null;
+    var moved = list.splice(from, 1)[0];
+    if (from < to) to -= 1;
+    if (after) to += 1;
+    if (from === to) return null;
+    list.splice(to, 0, moved);
+    writeFavourites(list);
+    return model ? snapshot() : null;
+  }
+
   function findProfiles(query, cb) {
     var q = cleanQuery(query);
     if (q.length < 2) return cb(null, []);
@@ -711,6 +730,11 @@
   }
 
   function assemble(groups) {
+    // Apply the saved order even when a timeline request began before a drag.
+    var order = favouriteHandles().map(function (handle) { return handle.toLowerCase(); });
+    groups = groups.slice().sort(function (a, b) {
+      return order.indexOf(String(a.handle || '').toLowerCase()) - order.indexOf(String(b.handle || '').toLowerCase());
+    });
     var accountRows = [];
     var all = [];
     var live = [];
@@ -980,6 +1004,7 @@
       });
     },
     isFavourite: isFavourite,
+    reorderFavourite: reorderFavourite,
     toggleFavourite: toggleFavourite
   };
 })();
