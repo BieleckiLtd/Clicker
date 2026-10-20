@@ -273,7 +273,7 @@ test('opening a video and Back restores search filter and focused result', async
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#app').getAttribute('class'), 'screen-search');
   assert.equal(await page.locator('#results .focused .ttl').innerText(), title);
-  assert.equal(await page.locator('#chips .selected').innerText(), 'Videos');
+  assert.equal(await page.locator('#chips .selected .chip-label').innerText(), 'Videos');
 });
 
 test('a late response cannot overwrite a new query during the debounce', async t => {
@@ -473,7 +473,8 @@ test('search shows progress and channels before the slowest timeline finishes', 
   await page.locator('#results .card').first().waitFor();
   assert.equal(await page.locator('#results').getAttribute('aria-busy'), 'true');
   await page.waitForFunction(() => document.getElementById('results').getAttribute('aria-busy') === 'false');
-  assert.match(await page.locator('#searchStatus').innerText(), /13 videos and broadcasts/);
+  assert.equal(await page.locator('#chips .chip-count').nth(0).innerText(), '13');
+  assert.equal(await page.locator('#chips .chip-count').nth(3).innerText(), '8');
 });
 
 test('TV delete key uses an SVG and actually deletes a character', async t => {
@@ -497,7 +498,7 @@ test('on-screen Back closes playback and sidebar Back closes Search', async t =>
   assert.equal(await page.locator('#video').evaluate(v => v.paused), true);
   assert.equal(await page.locator('#video').getAttribute('src'), null);
   assert.equal(await page.locator('#results .focused .ttl').innerText(), title);
-  assert.equal(await page.locator('#chips .selected').innerText(), 'Videos');
+  assert.equal(await page.locator('#chips .selected .chip-label').innerText(), 'Videos');
   await page.locator('[data-nav="back"]').click();
   assert.equal(await page.locator('#app').getAttribute('class'), 'screen-browse');
 });

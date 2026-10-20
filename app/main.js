@@ -872,7 +872,7 @@
     }
     var chipsHtml = '';
     for (var n = 0; n < CHIPS.length; n++) {
-      chipsHtml += '<button type="button" class="chip" data-i="' + n + '">' + CHIPS[n] + '</button>';
+      chipsHtml += '<button type="button" class="chip" data-i="' + n + '"><span class="chip-label">' + CHIPS[n] + '</span><span class="chip-count"></span></button>';
     }
     document.getElementById('chips').innerHTML = chipsHtml;
     var chips = document.querySelectorAll('#chips .chip');
@@ -919,8 +919,16 @@
     if (state.searching) status.textContent = state.searchProfiles.length ?
       'Loading videos · ' + state.searchCompleted + ' of ' + state.searchTotal + ' channels' : 'Finding channels…';
     else if (state.searchError) status.textContent = state.searchError;
-    else if (state.searchProfiles.length) status.textContent = state.searchItems.length + ' videos and broadcasts · ' + state.searchProfiles.length + ' channels';
-    else status.textContent = 'Search by channel name or @handle';
+    else status.textContent = state.searchProfiles.length ? '' : 'Search by channel name or @handle';
+    var live = 0;
+    for (var l = 0; l < state.searchItems.length; l++) if (state.searchItems[l].live) live++;
+    var counts = state.searchProfiles.length ?
+      [state.searchItems.length, live, state.searchItems.length - live, state.searchProfiles.length] : [];
+    var countEls = document.querySelectorAll('#chips .chip-count');
+    for (var n = 0; n < countEls.length; n++) {
+      countEls[n].textContent = counts.length ? String(counts[n]) : '';
+      countEls[n].style.display = counts.length ? '' : 'none';
+    }
     for (var c = 0; c < list.length; c++) {
       html += state.chipIndex === 3 ? channelHTML(list[c]) :
         cardHTML(list[c], false, Math.floor(c / COLS), c % COLS).replace('class="card', 'class="result card');

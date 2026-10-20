@@ -164,6 +164,8 @@ html.artwork #backdrop { display: block; }
   vertical-align: top;
   white-space: nowrap;
 }
+.chip-count { min-width: 30px; height: 30px; margin-right: -12px; margin-left: 12px; padding: 0 9px; border-radius: 15px; background: rgba(255,255,255,0.16); font-size: 18px; line-height: 30px; text-align: center; }
+.chip.selected .chip-count { background: rgba(0,0,0,0.14); }
 .home-chip.selected, .chip.selected { background: #fff; color: #000; }
 .home-chip.focused, .chip.focused { box-shadow: 0 0 0 3px #000, 0 0 0 6px #fff; }
 .home-chip.focused:not(.selected), .chip.focused:not(.selected) { background: var(--fill-2); color: #fff; }
