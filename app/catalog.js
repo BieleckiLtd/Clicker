@@ -264,7 +264,6 @@
 
   function usableThumb(url) {
     if (!url || url.indexOf('https://') !== 0) return '';
-    if (/pscp\.tv/i.test(url)) return '';
     return url;
   }
 
@@ -342,7 +341,9 @@
       url: url,
       live: live,
       title: metaContent(html, 'twitter:text:broadcast_title') || metaContent(html, 'og:description') || '',
-      thumbnail: usableThumb(metaContent(html, 'og:image')),
+      thumbnail: usableThumb(metaContent(html, 'twitter:image:broadcast_thumbnail:src')) ||
+        usableThumb(metaContent(html, 'og:image:secure_url')) || usableThumb(metaContent(html, 'og:image')) ||
+        usableThumb(metaContent(html, 'twitter:image')),
       durationSec: end > start ? Math.round((end - start) / 1000) : null,
       views: viewsFrom(html)
     };

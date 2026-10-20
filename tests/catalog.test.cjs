@@ -90,6 +90,25 @@ test('each saved channel gets automatic broadcast checks beyond four newer broad
   assert.equal(requests.filter(url => url.startsWith('https://x.com/')).length, 5, 'at most four automatic checks per channel');
 });
 
+test('broadcast thumbnails keep signed Periscope frame URLs from HTML and the fallback resolver', async () => {
+  const frame = 'https://prod-fastly-us-east-1.video.pscp.tv/Transcoding/v1/live_thumbnail/stream/latest.jpg?token=signed&service=proxsee';
+  const { api } = catalog([], url => {
+    if (url.hostname === 'x.com') return url.pathname.endsWith('/Fallback') ? null : { body: metadata('Direct', true) +
+      '<meta property="og:image" content="https://pbs.twimg.com/generic.jpg">' +
+      '<meta content="' + frame.replace(/&/g, '&amp;') + '" name="twitter:image:broadcast_thumbnail:src">' };
+    if (url.hostname === 'api.microlink.io') return { body: { status: 'success', data: {
+      video: { url: 'https://prod.pscp.tv/Fallback/master.m3u8?type=live' }, image: { url: frame }
+    } } };
+    return { body: '#EXTM3U\n' };
+  });
+  for (const broadcastId of ['Direct', 'Fallback']) {
+    const item = { broadcastId };
+    await new Promise((resolve, reject) => api.resolve(item, error => error ? reject(error) : resolve()));
+    assert.equal(item.thumbnail, frame);
+    assert.equal(item.live, true);
+  }
+});
+
 test('portrait videos are named by their short side, play up to 1080p, and keep their caption playlist', async () => {
   const formats = ['480x852', '720x1280', '1080x1920'].map(size => ({
     url: 'https://video.twimg.com/amplify_video/9/vid/avc1/' + size + '/clip.mp4', container: 'mp4', bitrate: Number(size.split('x')[0]) * 1000 }));

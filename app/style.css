@@ -194,6 +194,7 @@ html.artwork #backdrop { display: block; }
 .focus-ring { position: absolute; left: 0; top: 0; z-index: 3; border-radius: 14px; box-shadow: 0 0 0 4px #fff, 0 0 28px rgba(255,255,255,0.18); opacity: 0; pointer-events: none; will-change: transform; }
 .focus-ring.on { opacity: 1; }
 .thumb img.shot { display: block; width: 100%; height: 100%; object-fit: cover; }
+.thumb img.shot.channel-shot { position: absolute; top: 50%; left: 50%; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; object-fit: contain; }
 .thumb img.shot.logo-shot { object-fit: contain; padding: 70px; opacity: 0.22; }
 .thumb .logo-shot { background: radial-gradient(circle at 30% 20%, #2a2a2a, #0c0c0c 75%); }
 .card .cap { position: absolute; top: 226px; left: 0; right: 0; padding: 18px 4px 0; }

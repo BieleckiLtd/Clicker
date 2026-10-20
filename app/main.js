@@ -569,9 +569,11 @@
     var dur = (!item.live && item.durationSec)
       ? '<span class="dur">' + esc(formatDuration(item.durationSec)) + '</span>'
       : '';
-    var shotSrc = item.thumbnail ? assetUrl(item.thumbnail) : 'logo.png';
-    var shotClass = item.thumbnail ? 'shot' : 'shot logo-shot';
-    var shot = '<img class="' + shotClass + '" alt="" src="' + esc(shotSrc) + '">';
+    var channelSrc = item.authorAvatar ? assetUrl(item.authorAvatar) : '';
+    var shotSrc = item.thumbnail ? assetUrl(item.thumbnail) : channelSrc || 'logo.png';
+    var shotClass = item.thumbnail ? 'shot' : channelSrc ? 'shot channel-shot' : 'shot logo-shot';
+    var shot = '<img class="' + shotClass + '" alt=""' +
+      (item.thumbnail && channelSrc ? ' data-channel-src="' + esc(channelSrc) + '"' : '') + ' src="' + esc(shotSrc) + '">';
     var av = item.authorAvatar ? '<img class="av" alt="" src="' + esc(assetUrl(item.authorAvatar)) + '">' : '';
     var hint = hero ? '<div class="playhint">OK to play</div>' : '';
     var progress = !item.live && window.HelloFavourites ? HelloFavourites.progress(item.id) : null;
@@ -596,14 +598,22 @@
           this.src = 'logo.png';
           return;
         }
+        if (cls.indexOf('shot') !== -1 && this.getAttribute('data-channel-src')) {
+          var channelSrc = this.getAttribute('data-channel-src');
+          this.removeAttribute('data-channel-src');
+          this.className = 'shot channel-shot';
+          this.src = channelSrc;
+          return;
+        }
         if (cls.indexOf('shot') !== -1 && this.getAttribute('data-fallback') !== '1') {
           this.setAttribute('data-fallback', '1');
-          if (cls.indexOf('logo-shot') === -1) this.className = cls + ' logo-shot';
+          this.className = 'shot logo-shot';
           this.src = 'logo.png';
           return;
         }
         this.style.visibility = 'hidden';
       };
+      if (imgs[i].complete && !imgs[i].naturalWidth) imgs[i].onerror();
     }
   }
 

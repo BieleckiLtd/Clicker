@@ -92,7 +92,7 @@ async function fixture(t, options = {}) {
       if (handle === 'beta') results.push(clip('alpha', 1));
       if (handle === 'alpha') results.push({
         type: 'status', id: 'cast-post', text: 'Live launch https://x.com/i/broadcasts/TestCast', created_timestamp: 1000,
-        author: { name: 'ALPHA', screen_name: 'alpha' }
+        author: { name: 'ALPHA', screen_name: 'alpha', avatar_url: options.broadcastAvatar || '' }
       });
       if (options.captions) results.forEach(status => status.media && status.media.videos[0].formats.unshift({
         url: 'https://video.twimg.com/' + status.id + '/pl/master.m3u8?tag=1', container: 'm3u8' }));
@@ -113,11 +113,13 @@ async function fixture(t, options = {}) {
         '<meta property="og:video:url" content="https://prod.pscp.tv/TestCast/playlist.m3u8?type=live">' +
         '<meta name="twitter:string:broadcast_state" content="' + (options.replay ? 'ENDED' : 'RUNNING') + '">' +
         '<meta name="twitter:text:broadcast_title" content="Live launch">' +
-        '<meta property="og:image" content="https://pbs.twimg.com/test.jpg">' +
+        '<meta property="og:image" content="' + (options.broadcastThumbnail === undefined ? 'https://pbs.twimg.com/test.jpg' : options.broadcastThumbnail) + '">' +
         (options.broadcastChat ? '<meta name="twitter:text:broadcast_media_key" content="28_123">' +
           'broadcast_by_rest_id:$R[15]={broadcast_id:"TestCast",chat_option:2,total_watched:99999,total_watching:123,user_results:$R[17]={}' : '')
       });
     }
+    if (options.failedImages && options.failedImages.includes(url.pathname)) return route.fulfill({ status: 404, body: '' });
+    if (url.hostname.endsWith('.video.pscp.tv')) return route.fulfill({ contentType: 'image/png', body: fs.readFileSync(path.join(root, 'logo.png')) });
     if (url.hostname === 'prod.pscp.tv') {
       if (url.pathname.endsWith('/playback.ts')) return route.fulfill({ contentType: 'video/mp2t', headers: { 'access-control-allow-origin': '*' }, body: fs.readFileSync(path.join(__dirname, 'fixtures/playback.ts')) });
       if (/\/(720|360|2160)\.m3u8$/.test(url.pathname)) {
@@ -184,6 +186,38 @@ async function exitPlayer(page) {
 test('all shipped scripts parse as ES5 for webOS 4.5', () => {
   for (const file of fs.readdirSync(root, { recursive: true }).filter(file => file.endsWith('.js'))) {
     acorn.parse(fs.readFileSync(path.join(root, file), 'utf8'), { ecmaVersion: 5 });
+  }
+});
+
+for (const example of [
+  { name: 'uses the stream frame', thumbnail: 'https://prod-fastly-us-east-1.video.pscp.tv/live_thumbnail/latest.jpg?token=signed&service=proxsee', className: 'shot' },
+  { name: 'uses the channel logo when no frame is supplied', thumbnail: '', className: 'shot channel-shot' },
+  { name: 'uses the channel logo when the frame fails', thumbnail: 'https://pbs.twimg.com/broken-frame.jpg', failedImages: ['/broken-frame.jpg'], className: 'shot channel-shot' },
+  { name: 'uses the app logo if both frame and channel logo fail', thumbnail: 'https://pbs.twimg.com/broken-frame.jpg', failedImages: ['/broken-frame.jpg', '/channel.jpg'], className: 'shot logo-shot' }
+]) test('broadcast artwork ' + example.name + ' in Home and Search', async t => {
+  const avatar = 'https://pbs.twimg.com/channel.jpg';
+  const { page } = await fixture(t, {
+    broadcastThumbnail: example.thumbnail, broadcastAvatar: avatar, failedImages: example.failedImages,
+    homeStatuses: [{ type: 'status', id: 'home-cast', text: 'Live launch https://x.com/i/broadcasts/TestCast',
+      created_timestamp: Math.floor(Date.now() / 1000), author: { name: 'SpaceX', screen_name: 'SpaceX', avatar_url: avatar } }]
+  });
+  await query(page);
+  await page.locator('#results .badge.live').waitFor();
+  await chip(page, 'Live');
+  const expected = example.className === 'shot' ? example.thumbnail : example.className === 'shot channel-shot' ? avatar : origin + '/logo.png';
+  for (const host of ['#results', '#rows']) {
+    if (host === '#rows') await page.locator('[data-nav="home"]').click();
+    const image = page.locator(host + ' .card').filter({ has: page.locator('.badge.live') }).first().locator('.shot');
+    await page.waitForFunction(({ host, expected, className }) => {
+      const badge = document.querySelector(host + ' .badge.live');
+      const image = badge && badge.parentNode.querySelector('.shot');
+      return image && image.src === expected && image.className === className && image.complete && image.naturalWidth > 0;
+    }, { host, expected, className: example.className });
+    assert.equal(await image.evaluate(node => getComputedStyle(node).visibility), 'visible');
+    if (example.className === 'shot channel-shot') {
+      assert.equal(await image.evaluate(node => getComputedStyle(node).width), '112px');
+      assert.equal(await image.evaluate(node => getComputedStyle(node).opacity), '1');
+    }
   }
 });
 
