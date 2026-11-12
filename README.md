@@ -2,7 +2,7 @@
 
 A TV app for LG webOS TVs that plays videos and live broadcasts from public X channels. No X login needed.
 
-![Clicker playing a SpaceX video](docs/screenshot.png)
+![Clicker playing a SpaceX video in 4K](docs/screenshot.png)
 
 ## 1. Set up your TV (once)
 

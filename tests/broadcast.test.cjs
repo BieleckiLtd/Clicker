@@ -89,7 +89,10 @@ test('public chat handles nested payloads, filters non-chat, deduplicates and st
   await f.flush();
   assert.equal(f.updates.at(-1).messages.length, 1);
   assert.equal(f.updates.at(-1).messages[0].text, '<b>literal</b> 🪩');
-  assert.equal(f.requests.find(e => e.url.pathname.endsWith('accessChatPublic')).method, 'GET');
+  const access = f.requests.find(e => e.url.pathname.endsWith('accessChatPublic'));
+  assert.equal(access.method, 'POST');
+  assert.equal(access.url.search, '', 'the chat token is not put in the URL');
+  assert.deepEqual(access.body, { chat_token: 'public-chat-token' });
   assert.equal(f.requests.find(e => e.url.pathname.endsWith('/history')).body.access_token, 'live-access');
   batch = [msg('1', 'duplicate'), msg('3', 'New live message')];
   await f.run(3000);
@@ -153,5 +156,26 @@ test('a chat server outside the expected domain is rejected before sharing acces
   await f.flush();
   assert.equal(f.updates.at(-1).chatState, 'error');
   assert.ok(!f.requests.some(e => e.url.hostname === 'other.example'));
+  f.watcher.close();
+});
+
+test('an ended broadcast without a chat server says history is unavailable and does not retry', async () => {
+  const f = fixture(e => e.url.pathname.endsWith('accessChatPublic') ?
+    { body: { access_token: 'token', endpoint: '', read_only: true } } : source(e, { html: page('ENDED', 42) }));
+  f.watcher.setChatEnabled(true);
+  await f.flush();
+  assert.equal(f.updates.at(-1).chatState, 'unavailable');
+  assert.ok(!f.requests.some(e => e.url.pathname.endsWith('/history')));
+  assert.equal(f.timers.size, 0, 'nothing is scheduled to retry');
+  f.watcher.close();
+});
+
+test('a live broadcast without a chat server is still a retryable failure', async () => {
+  const f = fixture(e => e.url.pathname.endsWith('accessChatPublic') ?
+    { body: { access_token: 'token', endpoint: '' } } : source(e));
+  f.watcher.setChatEnabled(true);
+  await f.flush();
+  assert.equal(f.updates.at(-1).chatState, 'error');
+  assert.ok([...f.timers.values()].some(t => t.ms === 10000));
   f.watcher.close();
 });

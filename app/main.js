@@ -1676,6 +1676,7 @@
           (messages[m].handle ? ' <span>@' + esc(messages[m].handle) + '</span>' : '') + '</div><div class="post-text">' + esc(messages[m].text) + '</div></div>';
       }
       if (info && info.chatState === 'off') html += '<div class="post-note">Chat is turned off for this broadcast.</div>';
+      else if (info && info.chatState === 'unavailable') html += '<div class="post-note">Chat history isn’t available for this broadcast.</div>';
       else if (info && info.chatState === 'error') html += '<div class="post-note">Chat could not connect. Press OK to retry.</div><button type="button" id="chatRetry">Try again</button>';
       else if (!info || info.chatState === 'loading' || info.chatState === 'idle') html += '<div class="post-note" role="status">Loading broadcast chat…</div>';
       else if (!messages.length) html += '<div class="post-note">' + (info.ended ? 'No chat messages were returned for this broadcast.' : 'No chat messages yet.') + '</div>';

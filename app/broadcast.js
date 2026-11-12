@@ -56,7 +56,7 @@
       if (!stopped) onUpdate({ live: info.live, ended: info.ended, watching: info.watching,
         chatOff: info.chatOff, chatState: chatState, messages: messages.slice() });
     }
-    function request(method, url, body, cb) {
+    function request(method, url, body, cb, contentType) {
       if (stopped) return;
       var xhr = new XMLHttpRequest(), done = false;
       function finish(error) {
@@ -70,7 +70,7 @@
       try {
         xhr.open(method, url, true);
         xhr.timeout = 12000;
-        if (body !== null) xhr.setRequestHeader('Content-Type', 'application/json');
+        if (body !== null) xhr.setRequestHeader('Content-Type', contentType || 'application/json');
         xhr.onload = function () { finish(xhr.status === 200 ? null : new Error('HTTP ' + xhr.status)); };
         xhr.onerror = xhr.ontimeout = function () { finish(new Error('Network unavailable')); };
         xhr.send(body === null ? null : JSON.stringify(body));
@@ -125,16 +125,19 @@
         if (!enabled || gen !== chatGen) return;
         var status = !error && json(text);
         if (!status || !status.chatToken) return chatFailed(gen);
-        // GET is supported by the public endpoint and works from the TV's file origin.
-        request('GET', 'https://proxsee-cf.pscp.tv/api/v2/accessChatPublic?chat_token=' + encodeURIComponent(status.chatToken), null, function (err, result) {
+        // The public endpoint now accepts POST only (GET returns 404, checked 2026-11-12).
+        // A text/plain body keeps it a simple request, with no CORS preflight.
+        request('POST', 'https://proxsee-cf.pscp.tv/api/v2/accessChatPublic', { chat_token: status.chatToken }, function (err, result) {
           if (!enabled || gen !== chatGen) return;
           var access = !err && json(result);
           var endpoint = access && ((!info.live && access.replay_endpoint) || access.endpoint);
           var token = access && ((!info.live && access.replay_access_token) || access.access_token);
+          // X answers ended broadcasts with an empty chat server: their chat history is gone.
+          if (access && !info.live && info.ended && !endpoint) { chatState = 'unavailable'; publish(); return; }
           if (!chatEndpoint(endpoint) || typeof token !== 'string' || !token) return chatFailed(gen);
           session = { endpoint: endpoint.replace(/\/$/, ''), token: token };
           history(gen, '', 0);
-        });
+        }, 'text/plain');
       });
     }
     function refresh() {
