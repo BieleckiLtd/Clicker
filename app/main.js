@@ -1466,9 +1466,11 @@
     document.getElementById('statsPanel').className = state.statsOn ? 'on' : '';
     paintPlayerActions();
     if (state.statsOn) {
+      // hls.js streams report their own downloads; a plain file is measured directly.
+      if (window.HelloNetwork) HelloNetwork.start(function () { return state.playing && !state.hls ? mediaUrl(state.playing) : ''; });
       paintStats();
       state.statsTimer = setInterval(paintStats, 1000);
-    }
+    } else if (window.HelloNetwork) HelloNetwork.stop();
     showControls(false);
   }
 
@@ -1612,7 +1614,7 @@
     var rows = [
       ['Decoded resolution', video.videoWidth ? video.videoWidth + ' × ' + video.videoHeight : 'Waiting for video'],
       ['Selected quality', quality ? quality.label : 'Source'],
-      ['Stream', item.playback ? item.playback.type.toUpperCase() + (state.hls ? ' (MSE)' : '') : 'Unavailable'],
+      ['Stream', item.playback ? (state.hls ? 'HLS (MSE)' : item.playback.type.toUpperCase()) : 'Unavailable'],
       ['Codec', quality && quality.codec ? quality.codec : 'Not reported by source'],
       ['Source bitrate', quality && quality.bitrate ? (quality.bitrate / 1000000).toFixed(2) + ' Mbps' : 'Not reported by source'],
       ['Buffer ahead', buffer.toFixed(1) + ' seconds'],
@@ -1620,6 +1622,7 @@
       ['Position / duration', formatDuration(video.currentTime) + ' / ' + (item.live ? 'Live' : formatDuration(video.duration))],
       ['Player state', video.error ? 'Error ' + video.error.code : (item.playbackFailed ? 'Source failed' : (video.paused ? 'Paused' : (video.readyState < 3 ? 'Buffering' : 'Playing')))]
     ];
+    if (window.HelloNetwork) rows = rows.concat(HelloNetwork.rows());
     var html = '<div class="stats-heading"><span class="panel-title">Stats for nerds</span>' + panelClose('statsClose') + '</div><table>';
     for (var r = 0; r < rows.length; r++) html += '<tr><th>' + esc(rows[r][0]) + '</th><td>' + esc(rows[r][1]) + '</td></tr>';
     document.getElementById('statsPanel').innerHTML = html + '</table>';
@@ -1706,6 +1709,7 @@
     var level = state.hls ? hlsQualityLevel(state.hls, quality) : -1;
     if (level >= 0 && state.hls.levels.length > 1 && video.readyState >= 3 && !video.paused && !video.ended && !state.playing.playbackFailed) {
       state.pendingQuality = quality;
+      sizeHlsBuffer(state.hls, quality);
       state.hls.loadLevel = level;
       paintQualityButton();
       closeQualityMenu();
@@ -1729,10 +1733,33 @@
     } };
   }
 
+  // X's 4K MP4s declare a nonsense frame rate that makes the TV skip frames (see sps.js).
+  // The same video's HLS stream can be corrected as it loads, so anything above 1080p
+  // plays through that instead of the plain MP4 file.
+  function correctedMaster(item) {
+    var master = item.captionSource || '';
+    if (!window.HelloSps || item.noCorrectedStream || master.indexOf('.m3u8') === -1) return '';
+    var choices = playbackQualities();
+    for (var i = 0; i < choices.length; i++) {
+      if (choices[i].url === item.playback.url) return choices[i].height > 1080 ? master : '';
+    }
+    return '';
+  }
+
+  // X's video server has slow spells of about half a minute on this TV. A 4K stream
+  // needs most of the connection, so it keeps a longer buffer to play through them.
+  function sizeHlsBuffer(hls, quality) {
+    var tall = !!quality && quality.height > 1080;
+    hls.config.maxBufferLength = tall ? 30 : 20;
+    hls.config.maxBufferSize = tall ? 90000000 : 40000000;
+    hls.config.backBufferLength = tall ? 6 : 10;
+  }
+
   function hlsQualityLevel(hls, quality) {
     var levels = hls.levels || [];
     for (var i = 0; i < levels.length; i++) {
-      if (levels[i].height === quality.height) return i;
+      // Post video qualities are named by their short side, so a vertical 2160x3840 is 2160.
+      if (levels[i].height === quality.height || Math.min(levels[i].width || levels[i].height, levels[i].height) === quality.height) return i;
       var urls = levels[i].url || [];
       if (urls.indexOf(quality.url) !== -1) return i;
     }
@@ -1900,7 +1927,8 @@
     var video = document.getElementById('video');
     stopVideo(video);
     var url = mediaUrl(item);
-    if (item.playback.type === 'hls' && window.Hls && Hls.isSupported()) {
+    var master = item.playback.type === 'hls' ? (item.masterUrl || url) : correctedMaster(item);
+    if (master && window.Hls && Hls.isSupported()) {
       var hls = new Hls({
         autoStartLoad: false,
         enableWorker: true,
@@ -1912,7 +1940,8 @@
         backBufferLength: 10,
         manifestLoadPolicy: hlsLoadPolicy(12000),
         playlistLoadPolicy: hlsLoadPolicy(12000),
-        fragLoadPolicy: hlsLoadPolicy(30000)
+        fragLoadPolicy: hlsLoadPolicy(30000),
+        fLoader: window.HelloSps ? HelloSps.loader(Hls) : undefined
       });
       state.hls = hls;
       if (window.HelloTranscription) {
@@ -1945,24 +1974,35 @@
       hls.on(Hls.Events.MANIFEST_PARSED, function () {
         if (state.hls !== hls) return;
         var choices = playbackQualities();
+        var matched = false;
         for (var q = 0; q < choices.length; q++) if (choices[q].url === item.playback.url) {
           var level = hlsQualityLevel(hls, choices[q]);
-          if (level >= 0) { hls.startLevel = level; hls.loadLevel = level; }
+          if (level >= 0) { hls.startLevel = level; hls.loadLevel = level; matched = true; sizeHlsBuffer(hls, choices[q]); }
+        }
+        if (!matched && item.playback.type !== 'hls') {
+          // The stream lacks this resolution: play the MP4 file as before.
+          item.noCorrectedStream = true;
+          setTimeout(function () { if (state.hls === hls && state.playing === item) startPlayback(item); }, 0);
+          return;
         }
         hls.startLoad(state.restoreTime !== null ? state.restoreTime : -1);
+      });
+      hls.on(Hls.Events.FRAG_LOADED, function (event, data) {
+        var load = data.frag.stats.loading;
+        if (window.HelloNetwork && data.frag.type === 'main') HelloNetwork.sample(data.frag.stats.total, load.end - load.first, load.first - load.start, data.frag.url);
       });
       hls.on(Hls.Events.FRAG_CHANGED, function (event, data) {
         if (state.hls !== hls) return;
         var choices = playbackQualities();
         for (var q = 0; q < choices.length; q++) if (data.frag.level === hlsQualityLevel(hls, choices[q])) {
-          item.playback = { type: 'hls', url: choices[q].url };
+          item.playback = { type: choices[q].type || 'hls', url: choices[q].url };
           break;
         }
         if (state.pendingQuality && data.frag.level === hlsQualityLevel(hls, state.pendingQuality)) state.pendingQuality = null;
         paintQualityButton();
       });
       hls.attachMedia(video);
-      hls.loadSource(item.masterUrl || url);
+      hls.loadSource(master);
     } else if (item.playback.type === 'hls') {
       var source = document.createElement('source');
       source.setAttribute('src', url);
@@ -2000,6 +2040,7 @@
     resetCaptions(null);
     state.statsOn = false;
     clearInterval(state.statsTimer);
+    if (window.HelloNetwork) HelloNetwork.stop();
     document.getElementById('statsPanel').className = '';
     state.postOpen = false;
     paintPlayerActions();
@@ -2406,6 +2447,7 @@
     if (state.broadcast) state.broadcast.setChatEnabled(false);
     state.statsOn = false;
     clearInterval(state.statsTimer);
+    if (window.HelloNetwork) HelloNetwork.stop();
     document.getElementById('qualityMenu').className = '';
     document.getElementById('captionsMenu').className = '';
     document.getElementById('postPanel').className = '';

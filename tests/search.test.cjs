@@ -134,7 +134,8 @@ async function fixture(t, options = {}) {
     if (url.hostname === 'video.twimg.com' && options.captions && /\.(m3u8|vtt)$/.test(url.pathname)) {
       const text = url.pathname.endsWith('/pl/master.m3u8')
         ? '#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="en (auto-generated)",DEFAULT=NO,AUTOSELECT=YES,URI="/subs/en.m3u8",LANGUAGE="en"\n' +
-          '#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720,SUBTITLES="subs"\nvideo/720.m3u8\n'
+          '#EXT-X-STREAM-INF:BANDWIDTH=1000,RESOLUTION=1280x720,SUBTITLES="subs"\nvideo/720.m3u8\n' +
+          (options.uhdStream ? '#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=' + (options.uhdStream === 'vertical' ? '2160x3840' : '3840x2160') + ',SUBTITLES="subs"\nvideo/2160.m3u8\n' : '')
         : url.pathname === '/subs/en.m3u8'
           ? '#EXTM3U\n#EXT-X-TARGETDURATION:30\n#EXTINF:30,\n/subtitles/en.vtt\n#EXT-X-ENDLIST\n'
           : 'WEBVTT\n\n00:00:01.000 --> 00:00:05.000\n<X-word-ms ms=1>Hello &lt;b&gt;captions&lt;/b&gt; &amp; more</X-word-ms>\n\n' +
@@ -643,6 +644,44 @@ test('quality menu switches MP4 resolution and includes source 4K', async t => {
   assert.match(await page.locator('#video').getAttribute('src'), /3840x2160/);
 });
 
+test('4K MP4 plays through its corrected HLS stream when the post has one', async t => {
+  const { page, requests } = await fixture(t, { captions: true, uhdStream: true });
+  await query(page);
+  await chip(page, 'Videos');
+  await page.locator('#results .card').first().click();
+  assert.match(await page.locator('#video').getAttribute('src'), /1280x720/);
+  await remote(page, 403);
+  const variant = page.waitForRequest(request => request.url().includes('/video/2160.m3u8'));
+  await page.locator('#qualityMenu .quality-option').getByText('2160p · 4K', { exact: true }).click();
+  await variant;
+  assert.match(await page.locator('#video').getAttribute('src'), /^blob:/);
+  assert.ok(!requests.some(url => url.includes('3840x2160/clip.mp4')), 'the uncorrected 4K file is not played');
+  assert.match(await page.locator('#qualityButton').innerText(), /2160p/);
+});
+
+test('vertical 4K MP4 finds its HLS variant by the short side', async t => {
+  const { page, requests } = await fixture(t, { captions: true, uhdStream: 'vertical' });
+  await query(page);
+  await chip(page, 'Videos');
+  await page.locator('#results .card').first().click();
+  await remote(page, 403);
+  const variant = page.waitForRequest(request => request.url().includes('/video/2160.m3u8'));
+  await page.locator('#qualityMenu .quality-option').getByText('2160p · 4K', { exact: true }).click();
+  await variant;
+  assert.ok(!requests.some(url => url.includes('3840x2160/clip.mp4')), 'the uncorrected 4K file is not played');
+});
+
+test('4K MP4 plays directly when its HLS stream has no 4K variant', async t => {
+  const { page } = await fixture(t, { captions: true });
+  await query(page);
+  await chip(page, 'Videos');
+  await page.locator('#results .card').first().click();
+  await remote(page, 403);
+  await page.locator('#qualityMenu .quality-option').getByText('2160p · 4K', { exact: true }).click();
+  await page.waitForFunction(() => /3840x2160/.test(document.getElementById('video').getAttribute('src') || ''));
+  assert.match(await page.locator('#qualityButton').innerText(), /2160p/);
+});
+
 test('HLS quality selector keeps 4K variants while defaulting to a 1080p-or-lower stream', async t => {
   const { page, requests } = await fixture(t);
   await query(page);
@@ -683,6 +722,7 @@ test('Stats for nerds is only on the Blue key and closes with the player', async
   await remote(page, 406);
   assert.equal(await page.locator('#statsPanel.on').count(), 1);
   assert.match(await page.locator('#statsPanel').innerText(), /Decoded resolution[\s\S]*Buffer ahead[\s\S]*Frames \/ dropped/);
+  assert.match(await page.locator('#statsPanel').innerText(), /Network\s+Online[\s\S]*Download speed[\s\S]*Video server/);
   await page.locator('#statsClose').click();
   assert.equal(await page.locator('#statsPanel.on').count(), 0);
   await remote(page, 406);

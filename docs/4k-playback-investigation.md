@@ -38,3 +38,25 @@ Verified workaround: select 1080p. The clip was left paused at the original
 No application code or installed package was changed: there is no verified
 software fix retaining 4K from these tests. Temporary HLS playback, sampling
 timers, event listeners and graphics overrides were cleaned up.
+
+## Resolved — 2026-11-12
+
+The decoder is not at fault. X writes a nonsense frame rate into the H.264 header
+(SPS VUI timing: `num_units_in_tick` 1, `time_scale` 480000, i.e. 240000 fps) while
+the MP4 container holds the real 23.976 fps. Every rendition has it. At 1080p the TV
+ignores it; at 2160p, where its H.264 decoder is rated for 30 fps, it skips frames.
+Nothing is visible to the page: buffer steady at about 12 s, no underflow events from
+`com.webos.media`, CPU and memory normal.
+
+Viewer-confirmed on the TV, same clip at 2160p each time:
+
+- All player overlays and page updates removed: still drops frames.
+- Unmodified file served from the PC: drops frames.
+- Same file, stream-copied with only the VUI timing set to 1001 / 48000: smooth.
+- X's own HLS stream through hls.js with the init segment corrected in the page: smooth.
+
+Fix: `app/sps.js` rewrites the timing in the fMP4 init segment from the container's
+sample duration (hls.js fragment loader), and qualities above 1080p of a post video
+play through the post's HLS stream instead of the MP4 file, which cannot be altered
+in flight. X's HLS segments carry no in-band SPS, so the init segment is sufficient.
+MPEG-TS streams are not corrected.
