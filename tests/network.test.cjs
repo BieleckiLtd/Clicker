@@ -35,6 +35,25 @@ function load({ tv = false, online = true } = {}) {
 
 const MB = 1048576;
 
+test('buffering speed includes response wait and updates while a segment is still downloading', () => {
+  const { net } = load();
+  const stats = { loaded: 1000000, total: 4000000, loading: { start: 100, first: 2100, end: 0 } };
+  assert.equal(net.transfer(stats, 4100).mbps, 2, 'uses bytes received, including time waiting for the server');
+  assert.equal(net.transfer(stats, 8100).mbps, 1, 'a stopped transfer slows down even before it finishes');
+  assert.equal(net.transfer(stats, 8100).active, true);
+  stats.loaded = 0;
+  assert.equal(net.transfer(stats, 8100).mbps, 0, 'no bytes is a measured zero during a request');
+  stats.loaded = 1000000; stats.loading.end = 4100;
+  assert.equal(net.transfer(stats, 8100).mbps, 2);
+  assert.equal(net.transfer(stats, 8100).active, false, 'completed readings must be labelled as the last segment');
+  assert.equal(net.transfer(stats, 17000), null, 'stale readings are not presented as current');
+  stats.loading.end = 200;
+  assert.equal(net.transfer(stats, 300).mbps, 80, 'fast completed segments are still measurable');
+  stats.aborted = true;
+  assert.equal(net.transfer(stats, 4200), null);
+  assert.equal(net.transfer(null, 4200), null);
+});
+
 test('before anything is measured the rows say so', () => {
   assert.deepEqual(load().rows(), { Network: 'Online', 'Download speed': 'Not measured yet', 'Video server': 'Not checked yet' });
   assert.equal(load({ online: false }).rows().Network, 'Offline');
@@ -122,4 +141,34 @@ test('closing the panel abandons the request in flight', () => {
   assert.equal(env.requests[0].aborted, true);
   env.timers[0]();
   assert.equal(env.requests.length, 1, 'nothing is requested without a source');
+});
+
+test('a lost connection stops showing old speeds as current', () => {
+  const env = load({ tv: true });
+  env.net.start();
+  const bridge = env.bridges[0];
+  const status = (wifi, internet) => bridge.onservicecallback(JSON.stringify({ returnValue: true, isInternetConnectionAvailable: internet,
+    wired: { state: 'disconnected' }, wifi: { state: wifi, ssid: 'HomeNet' } }));
+  status('connected', true);
+  env.net.sample(7.5 * MB, 629, 250, 'https://video.twimg.com/amplify_video/1/a.m4s');
+  assert.match(env.rows()['Download speed'], /^100 Mbps now/);
+  status('disconnected', false);
+  assert.equal(env.rows().Network, 'Not connected');
+  assert.equal(env.rows()['Download speed'], 'No connection');
+  status('connected', true);
+  assert.equal(env.rows()['Download speed'], 'Not measured yet', 'speeds from before the drop are not brought back');
+
+  const browser = load({ online: false });
+  browser.net.sample(7.5 * MB, 629, 250, 'https://video.twimg.com/amplify_video/1/a.m4s');
+  assert.equal(browser.rows()['Download speed'], 'No connection');
+});
+
+test('a speed check that gets no answer clears old speeds', () => {
+  const env = load();
+  env.net.sample(7.5 * MB, 629, 250, 'https://video.twimg.com/clip.mp4');
+  env.clock += 13000;
+  env.net.start(() => 'https://video.twimg.com/clip.mp4');
+  env.clock += 8000; env.requests[0].ontimeout();
+  assert.equal(env.rows()['Download speed'], 'No data arriving');
+  assert.equal(env.rows()['Video server'], 'video.twimg.com · Not responding');
 });

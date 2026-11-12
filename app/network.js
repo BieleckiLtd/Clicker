@@ -16,6 +16,7 @@
   var timer = null;
   var probing = null;
   var urlFor = null;
+  var onFileData = null;
 
   function now() { return Date.now(); }
 
@@ -54,6 +55,8 @@
       try { status = xhr.status; } catch (e) {}
       if (!first && !loaded) {
         server = { host: host(url), status: status, wait: -1, at: now() };
+        // Nothing answered at all: earlier speeds no longer describe the connection.
+        if (!status) samples.length = 0;
         return;
       }
       sample(loaded, now() - (first || started), (first || now()) - started, '', status);
@@ -66,7 +69,11 @@
       xhr.timeout = PROBE_TIMEOUT;
       xhr.onreadystatechange = function () { if (xhr.readyState >= 2 && !first) first = now(); };
       xhr.onprogress = function (e) { if (!first) first = now(); loaded = e.loaded || loaded; };
-      xhr.onload = function () { if (xhr.response && xhr.response.byteLength) loaded = xhr.response.byteLength; finish(); };
+    xhr.onload = function () {
+      if (xhr.response && xhr.response.byteLength) loaded = xhr.response.byteLength;
+      finish();
+      if (onFileData && loaded && xhr.status >= 200 && xhr.status < 300) onFileData(url, xhr.response);
+    };
       xhr.onerror = finish;
       xhr.ontimeout = finish;
       xhr.onabort = finish;
@@ -88,6 +95,13 @@
       name: wired.state === 'connected' ? '' : (wifi.displayName || wifi.ssid || ''),
       internet: !!data.isInternetConnectionAvailable
     };
+    if (offline()) samples.length = 0;
+  }
+
+  // The TV (or browser) says there is no connection, so no speed can be current.
+  function offline() {
+    if (link) return !link.type || !link.internet;
+    return typeof navigator !== 'undefined' && navigator.onLine === false;
   }
 
   function watchLink() {
@@ -110,8 +124,9 @@
 
   // Called while the panel is open. `currentUrl` returns the file being played when it
   // is not an hls.js stream (those report their own downloads through sample()).
-  function start(currentUrl) {
+  function start(currentUrl, fileData) {
     urlFor = currentUrl || null;
+    onFileData = fileData || null;
     watchLink();
     clearInterval(timer);
     timer = setInterval(tick, 3000);
@@ -122,6 +137,7 @@
     clearInterval(timer);
     timer = null;
     urlFor = null;
+    onFileData = null;
     if (probing) { try { probing.abort(); } catch (e) {} }
     if (bridge) { try { bridge.cancel(); } catch (e2) {} bridge = null; }
   }
@@ -141,7 +157,11 @@
 
   function speedText() {
     trim();
-    if (!samples.length) return probing ? 'Measuring' : 'Not measured yet';
+    if (offline()) { samples.length = 0; return 'No connection'; }
+    if (!samples.length) {
+      if (server && server.wait < 0 && !server.status) return 'No data arriving';
+      return probing ? 'Measuring' : 'Not measured yet';
+    }
     var total = 0;
     var low = samples[0].mbps;
     for (var i = 0; i < samples.length; i++) {
@@ -164,5 +184,17 @@
     return [['Network', linkText()], ['Download speed', speedText()], ['Video server', serverText()]];
   }
 
-  window.HelloNetwork = { sample: sample, start: start, stop: stop, rows: rows };
+  // Read hls.js's live progress without starting a competing speed-test request.
+  // Include the server response wait: it also consumes the playback buffer.
+  function transfer(stats, clock) {
+    if (!stats || stats.aborted || !stats.loading) return null;
+    var timing = stats.loading;
+    var active = !timing.end;
+    var elapsed = (active ? clock : timing.end) - timing.start;
+    if (!(elapsed > 0) || (active && elapsed < 500) || (!active && clock - timing.end > 12000)) return null;
+    var bytes = stats.loaded || 0;
+    return { mbps: bytes * 8 / elapsed / 1000, active: active };
+  }
+
+  window.HelloNetwork = { sample: sample, start: start, stop: stop, rows: rows, transfer: transfer };
 })();

@@ -23,6 +23,67 @@
   function box(b, from, to, want) { var list = boxes(b, from, to, want); return list.length ? list[0] : -1; }
   function end(b, o) { return o + u32(b, o); }
 
+  function defaultSampleDuration(b, moov, trackId) {
+    var mvex = box(b, moov + 8, end(b, moov), 'mvex');
+    var trexes = mvex < 0 ? [] : boxes(b, mvex + 8, end(b, mvex), 'trex');
+    for (var i = 0; i < trexes.length; i++) {
+      var trex = trexes[i];
+      if (trex + 24 <= end(b, trex) && u32(b, trex + 12) === trackId) return u32(b, trex + 20);
+    }
+    return 0;
+  }
+
+  function frameRate(data) {
+    var b = data instanceof Uint8Array ? data : new Uint8Array(data);
+    var moov = box(b, 0, b.length, 'moov');
+    if (moov < 0) return 0;
+    var traks = boxes(b, moov + 8, end(b, moov), 'trak');
+    for (var i = 0; i < traks.length; i++) {
+      var trak = traks[i];
+      var mdia = box(b, trak + 8, end(b, trak), 'mdia');
+      if (mdia < 0) continue;
+      var hdlr = box(b, mdia + 8, end(b, mdia), 'hdlr');
+      var mdhd = box(b, mdia + 8, end(b, mdia), 'mdhd');
+      if (hdlr < 0 || hdlr + 20 > end(b, hdlr) || type(b, hdlr + 12) !== 'vide' || mdhd < 0) continue;
+      var scaleOffset = mdhd + (b[mdhd + 8] === 1 ? 28 : 20);
+      if (scaleOffset + 4 > end(b, mdhd)) continue;
+      var timescale = u32(b, scaleOffset);
+      var minf = box(b, mdia + 8, end(b, mdia), 'minf');
+      var stbl = minf < 0 ? -1 : box(b, minf + 8, end(b, minf), 'stbl');
+      var stts = stbl < 0 ? -1 : box(b, stbl + 8, end(b, stbl), 'stts');
+      if (stts >= 0 && stts + 16 <= end(b, stts)) {
+        var entries = u32(b, stts + 12);
+        var samples = 0;
+        var ticks = 0;
+        if (stts + 16 + entries * 8 <= end(b, stts)) {
+          for (var j = 0; j < entries; j++) {
+            var offset = stts + 16 + j * 8;
+            var count = u32(b, offset);
+            samples += count;
+            ticks += count * u32(b, offset + 4);
+          }
+        }
+        if (ticks) return timescale * samples / ticks;
+      }
+      var tkhd = box(b, trak + 8, end(b, trak), 'tkhd');
+      if (tkhd < 0) continue;
+      var idOffset = tkhd + (b[tkhd + 8] === 1 ? 28 : 20);
+      if (idOffset + 4 > end(b, tkhd)) continue;
+      var duration = defaultSampleDuration(b, moov, u32(b, idOffset));
+      if (duration) return timescale / duration;
+    }
+    return 0;
+  }
+
+  // hls.js remuxes MPEG-TS video into its own single-track MP4 fragments.
+  function fragmentFrameRate(b, seconds) {
+    if (!(seconds > 0)) return 0;
+    var moof = box(b, 0, b.length, 'moof');
+    var traf = moof < 0 ? -1 : box(b, moof + 8, end(b, moof), 'traf');
+    var trun = traf < 0 ? -1 : box(b, traf + 8, end(b, traf), 'trun');
+    return trun >= 0 && trun + 16 <= end(b, trun) ? u32(b, trun + 12) / seconds : 0;
+  }
+
   function gcd(a, c) { while (c) { var t = a % c; a = c; c = t; } return a; }
 
   function unescape(b, from, to) {
@@ -172,10 +233,7 @@
 
       var trackId = u32(b, tkhd + (b[tkhd + 8] === 1 ? 28 : 20));
       var timescale = u32(b, mdhd + (b[mdhd + 8] === 1 ? 28 : 20));
-      var duration = 0;
-      var mvex = box(b, moov + 8, end(b, moov), 'mvex');
-      var trexes = mvex < 0 ? [] : boxes(b, mvex + 8, end(b, mvex), 'trex');
-      for (var x = 0; x < trexes.length; x++) if (u32(b, trexes[x] + 12) === trackId) duration = u32(b, trexes[x] + 20);
+      var duration = defaultSampleDuration(b, moov, trackId);
       if (!timescale || !duration) return null;
 
       var count = b[avcC + 13] & 31;
@@ -242,5 +300,5 @@
     };
   }
 
-  window.HelloSps = { fixInit: fixInit, loader: loader };
+  window.HelloSps = { fixInit: fixInit, loader: loader, frameRate: frameRate, fragmentFrameRate: fragmentFrameRate };
 })();

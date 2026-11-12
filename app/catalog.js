@@ -313,10 +313,12 @@
       var bandwidth = /BANDWIDTH=(\d+)/.exec(line);
       var bw = bandwidth ? parseInt(bandwidth[1], 10) : 0;
       var codecs = /CODECS="([^"]+)"/.exec(line);
+      var rate = /(?:[:,])FRAME-RATE=(\d+(?:\.\d+)?)(?:,|$)/.exec(line);
       var url = absolutize(uri, masterUrl);
       if (url.indexOf('https://') !== 0) continue;
       if (!qualities[height] || bw > qualities[height].bitrate) qualities[height] = {
-        height: height, bitrate: bw, codec: codecs ? codecs[1] : '', url: url, type: 'hls', label: height === 2160 ? '2160p · 4K' : height + 'p'
+        height: height, bitrate: bw, codec: codecs ? codecs[1] : '', frameRate: rate ? Number(rate[1]) : 0,
+        url: url, type: 'hls', label: height === 2160 ? '2160p · 4K' : height + 'p'
       };
     }
     var out = [];
@@ -543,6 +545,8 @@
       postText: status.text || '',
       postUrl: status.url || '',
       replyCount: typeof status.replies === 'number' ? status.replies : null,
+      repostCount: typeof status.reposts === 'number' ? status.reposts : null,
+      likeCount: typeof status.likes === 'number' ? status.likes : null,
       authorName: author.name || author.screen_name || '',
       authorHandle: author.screen_name || '',
       authorAvatar: author.avatar_url || '',

@@ -25,7 +25,7 @@ async function fixture(t, options = {}) {
     const file = path.resolve(root, '.' + (url.pathname === '/' ? '/index.html' : url.pathname));
     if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
     try {
-      res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.html') ? 'text/html' : file.endsWith('.ttf') ? 'font/ttf' : 'image/png');
+      res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.html') ? 'text/html' : file.endsWith('.ttf') ? 'font/ttf' : file.endsWith('.svg') ? 'image/svg+xml' : 'image/png');
       let body = fs.readFileSync(file);
       if (options.staleStyles && file.endsWith('.css')) {
         // Reproduce a cached stylesheet from before the captions dialog was added.
@@ -41,7 +41,7 @@ async function fixture(t, options = {}) {
   context.setDefaultTimeout(5000);
   const errors = [], records = { transcriptions: 0, audio: null, modelRequests: 0, failKey: !!options.failKey };
   context.on('page', page => page.on('pageerror', error => errors.push(error.message)));
-  await context.route(origin + '/config.js', route => route.fulfill({ contentType: 'text/javascript', body: 'window.HELLO_TV=' + JSON.stringify({ accounts: ['SpaceX'], pairingUrl: origin }) }));
+  await context.route(url => url.origin === origin && url.pathname === '/config.js', route => route.fulfill({ contentType: 'text/javascript', body: 'window.HELLO_TV=' + JSON.stringify({ accounts: ['SpaceX'], pairingUrl: origin }) }));
   await context.route('https://**/*', async route => {
     const url = new URL(route.request().url());
     const json = (body, status = 200) => route.fulfill({ status, contentType: 'application/json', headers: { 'access-control-allow-origin': '*' }, body: JSON.stringify(body) });
@@ -65,7 +65,7 @@ async function fixture(t, options = {}) {
       if (options.rateLimit) return route.fulfill({ status: 429, headers: { 'access-control-allow-origin': '*', 'access-control-expose-headers': 'retry-after', 'retry-after': '60' }, body: '{}' });
       return json({ text: 'Live captions <b>are safe</b>', segments: [{ start: 0, end: 12, text: 'Live captions <b>are safe</b>', no_speech_prob: 0.01 }] });
     }
-    if (url.hostname === 'api.fxtwitter.com') return json({ results: [{ type: 'status', id: 'post1', text: 'Live launch https://x.com/i/broadcasts/TestCast', created_timestamp: Math.floor(Date.now() / 1000), author: { screen_name: 'SpaceX', name: 'SpaceX', avatar_url: origin + '/logo.png' } }] });
+    if (url.hostname === 'api.fxtwitter.com') return json({ results: [{ type: 'status', id: 'post1', text: 'Live launch https://x.com/i/broadcasts/TestCast', created_timestamp: Math.floor(Date.now() / 1000), author: { screen_name: 'SpaceX', name: 'SpaceX', avatar_url: origin + '/icon.png' } }] });
     if (url.hostname === 'x.com') return route.fulfill({ contentType: 'text/html', headers: { 'access-control-allow-origin': '*' }, body: '<meta property="og:video:url" content="https://prod.pscp.tv/TestCast/master.m3u8?type=live"><meta name="twitter:string:broadcast_state" content="RUNNING"><meta name="twitter:text:broadcast_title" content="Live launch">' });
     if (url.hostname === 'prod.pscp.tv') {
       const headers = { 'access-control-allow-origin': '*' };
@@ -122,6 +122,7 @@ test('a phone connects its own key through encrypted QR pairing and disconnect r
   const link = await page.evaluate(() => window.testPairUrl);
   const phone = await context.newPage();
   await phone.goto(link);
+  assert.equal(await phone.title(), 'Connect live captions · Clicker');
   await phone.locator('#key').fill(mockKey);
   await phone.locator('#connect').click();
   await phone.locator('body.done').waitFor();

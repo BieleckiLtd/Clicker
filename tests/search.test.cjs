@@ -15,7 +15,7 @@ before(async () => {
     const file = path.resolve(root, '.' + new URL(req.url, 'http://localhost').pathname.replace(/\/$/, '/index.html'));
     if (!file.startsWith(root + path.sep)) { res.writeHead(403).end(); return; }
     try {
-      res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.png') ? 'image/png' : file.endsWith('.svg') ? 'image/svg+xml' : file.endsWith('.ttf') ? 'font/ttf' : 'text/html');
+      res.setHeader('Content-Type', file.endsWith('.js') ? 'text/javascript' : file.endsWith('.css') ? 'text/css' : file.endsWith('.png') ? 'image/png' : file.endsWith('.svg') ? 'image/svg+xml' : file.endsWith('.ttf') ? 'font/ttf' : file.endsWith('.woff2') ? 'font/woff2' : 'text/html');
       res.end(fs.readFileSync(file));
     } catch { res.writeHead(404).end(); }
   });
@@ -33,8 +33,9 @@ function clip(handle, n) {
   return {
     type: 'status', id: handle + n, text: handle + ' video ' + n,
     created_timestamp: Math.floor(Date.now() / 1000) - 3600 + profiles.indexOf(handle) * 10 + n,
-    author: { name: handle.toUpperCase(), screen_name: handle, avatar_url: origin + '/logo.png' },
-    media: { videos: [{ duration: 90, thumbnail_url: origin + '/logo.png', formats: [
+    replies: 1, reposts: 2500, likes: 1200000,
+    author: { name: handle.toUpperCase(), screen_name: handle, avatar_url: origin + '/icon.png' },
+    media: { videos: [{ duration: 90, thumbnail_url: origin + '/icon.png', formats: [
       { url: 'https://video.twimg.com/' + handle + n + '/1280x720/clip.mp4', height: 720 },
       { url: 'https://video.twimg.com/' + handle + n + '/640x360/clip.mp4', height: 360 },
       { url: 'https://video.twimg.com/' + handle + n + '/3840x2160/clip.mp4', height: 2160 }
@@ -68,7 +69,7 @@ async function fixture(t, options = {}) {
       if (options.queryDelay) await new Promise(resolve => setTimeout(resolve, options.queryDelay(q)));
       if (options.searchFailure) return json({ message: 'unavailable' }, 503);
       const handles = options.empty ? [] : q === 'moon' ? ['moonchannel'] : profiles;
-      return json({ users: handles.map(handle => ({ screen_name: handle, name: handle.toUpperCase(), avatar_url: origin + '/logo.png' })) });
+      return json({ users: handles.map(handle => ({ screen_name: handle, name: handle.toUpperCase(), avatar_url: origin + '/icon.png' })) });
     }
     if (url.pathname.startsWith('/2/conversation/')) {
       if (options.commentsFailure) return json({ code: 404, replies: null }, 404);
@@ -119,7 +120,7 @@ async function fixture(t, options = {}) {
       });
     }
     if (options.failedImages && options.failedImages.includes(url.pathname)) return route.fulfill({ status: 404, body: '' });
-    if (url.hostname.endsWith('.video.pscp.tv')) return route.fulfill({ contentType: 'image/png', body: fs.readFileSync(path.join(root, 'logo.png')) });
+    if (url.hostname.endsWith('.video.pscp.tv')) return route.fulfill({ contentType: 'image/png', body: fs.readFileSync(path.join(root, 'icon.png')) });
     if (url.hostname === 'prod.pscp.tv') {
       if (url.pathname.endsWith('/playback.ts')) return route.fulfill({ contentType: 'video/mp2t', headers: { 'access-control-allow-origin': '*' }, body: fs.readFileSync(path.join(__dirname, 'fixtures/playback.ts')) });
       if (/\/(720|360|2160)\.m3u8$/.test(url.pathname)) {
@@ -130,7 +131,7 @@ async function fixture(t, options = {}) {
       return route.fulfill({ contentType: 'application/vnd.apple.mpegurl', headers: { 'access-control-allow-origin': '*' }, body: '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=500000,RESOLUTION=1280x720\n720.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=200000,RESOLUTION=640x360\n360.m3u8\n#EXT-X-STREAM-INF:BANDWIDTH=5000000,RESOLUTION=3840x2160\n2160.m3u8\n' });
     }
     if (url.hostname === 'api.microlink.io') return json({ status: 'fail' });
-    if (url.hostname === 'pbs.twimg.com') return route.fulfill({ contentType: 'image/png', body: fs.readFileSync(path.join(root, 'logo.png')) });
+    if (url.hostname === 'pbs.twimg.com') return route.fulfill({ contentType: 'image/png', body: fs.readFileSync(path.join(root, 'icon.png')) });
     if (url.hostname === 'video.twimg.com' && options.captions && /\.(m3u8|vtt)$/.test(url.pathname)) {
       const text = url.pathname.endsWith('/pl/master.m3u8')
         ? '#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="en (auto-generated)",DEFAULT=NO,AUTOSELECT=YES,URI="/subs/en.m3u8",LANGUAGE="en"\n' +
@@ -205,7 +206,7 @@ for (const example of [
   await query(page);
   await page.locator('#results .badge.live').waitFor();
   await chip(page, 'Live');
-  const expected = example.className === 'shot' ? example.thumbnail : example.className === 'shot channel-shot' ? avatar : origin + '/logo.png';
+  const expected = example.className === 'shot' ? example.thumbnail : example.className === 'shot channel-shot' ? avatar : origin + '/clicker-symbol.svg';
   for (const host of ['#results', '#rows']) {
     if (host === '#rows') await page.locator('[data-nav="home"]').click();
     const image = page.locator(host + ' .card').filter({ has: page.locator('.badge.live') }).first().locator('.shot');
@@ -301,6 +302,8 @@ test('opening a video and Back restores search filter and focused result', async
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('#app').getAttribute('class'), 'screen-player');
   assert.equal(await page.locator('#ptitle').innerText(), title);
+  assert.deepEqual(await page.locator('#psub .pstat').evaluateAll(stats => stats.map(s => [s.dataset.stat, s.textContent, s.getAttribute('aria-label'), !!s.querySelector('svg')])), [
+    ['comment', '1', '1 comment', true], ['repost', '2.5K', '2.5K reposts', true], ['like', '1.2M', '1.2M likes', true]]);
   assert.match(await page.locator('#video').getAttribute('src'), /video\.twimg\.com/);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#app').getAttribute('class'), 'screen-player');
@@ -634,7 +637,7 @@ test('quality menu switches MP4 resolution and includes source 4K', async t => {
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
   assert.match(await page.locator('#video').getAttribute('src'), /1280x720/);
-  await remote(page, 403);
+  await remote(page, 406);
   assert.match(await page.locator('#qualityMenu').innerText(), /2160p · 4K/);
   await page.locator('#qualityMenu .quality-option').getByText('360p', { exact: true }).click();
   assert.match(await page.locator('#video').getAttribute('src'), /640x360/);
@@ -644,13 +647,108 @@ test('quality menu switches MP4 resolution and includes source 4K', async t => {
   assert.match(await page.locator('#video').getAttribute('src'), /3840x2160/);
 });
 
+test('Home autoplay follows the selected board and remembers 4K through a lower-quality video and reload', async t => {
+  const homeStatuses = [1, 2, 3, 4].map(n => clip('SpaceX', n));
+  homeStatuses[1].media.videos[0].formats.pop();
+  const { page } = await fixture(t, { playable: true, homeStatuses });
+  await page.locator('[data-nav="home"]').click();
+  await page.locator('#homeChips .home-chip[data-channel="spacex"]').click();
+  const board = page.locator('#rows .card');
+  assert.deepEqual(await board.locator('.ttl').allTextContents(),
+    ['SpaceX video 4', 'SpaceX video 3', 'SpaceX video 2', 'SpaceX video 1']);
+  await board.nth(1).click();
+  const video = page.locator('#video');
+  const playing = (id, quality) => page.waitForFunction(({ id, quality }) => {
+    const v = document.getElementById('video');
+    return v.readyState >= 3 && !v.paused && v.currentSrc.includes('/SpaceX' + id + '/' + quality + '/');
+  }, { id, quality });
+  const finish = () => video.evaluate(v => { v.currentTime = v.duration - 0.15; });
+
+  await playing(3, '1280x720');
+  await remote(page, 406);
+  await page.getByRole('button', { name: '2160p · 4K', exact: true }).click();
+  await playing(3, '3840x2160');
+  await finish();
+  await playing(2, '1280x720');
+  assert.equal(await page.locator('#qualityLabel').textContent(), '720p');
+  assert.equal(await page.evaluate(() => HelloFavourites.progress('t:SpaceX3').completed), true);
+  await finish();
+  await playing(1, '3840x2160');
+  assert.equal(await page.locator('#qualityLabel').textContent(), '2160p · 4K');
+  await finish();
+  await page.waitForFunction(() => document.getElementById('video').ended);
+  assert.equal(await page.locator('#ptitle').textContent(), 'SpaceX video 1');
+  await page.locator('#playerBack').click();
+  assert.equal(await board.filter({ has: page.locator('.ttl', { hasText: 'SpaceX video 3' }) }).getAttribute('class'), 'card focused');
+
+  await page.reload();
+  await page.locator('#homeChips .home-chip[data-channel="spacex"]').click();
+  await board.first().click();
+  await playing(4, '3840x2160');
+});
+
+test('Down opens the filmstrip and OK can play earlier and later cards from the board', async t => {
+  const { page } = await fixture(t, { playable: true });
+  await query(page);
+  await chip(page, 'Videos');
+  const titles = await page.locator('#results .card .ttl').allTextContents();
+  await page.locator('#results .card').nth(2).click();
+  await page.waitForFunction(() => document.getElementById('video').readyState >= 3);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowDown');
+  const strip = page.locator('#filmstrip');
+  const cards = strip.locator('.filmstrip-card');
+  assert.equal(await strip.isVisible(), false, 'first Down reveals the timeline');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await strip.isVisible(), true);
+  assert.deepEqual(await cards.locator('.filmstrip-title').allTextContents(), titles.slice(0, 6));
+  assert.equal(await cards.nth(1).locator('.filmstrip-status').textContent(), 'Previous');
+  assert.equal(await cards.nth(3).locator('.filmstrip-status').textContent(), 'Up next');
+  assert.equal(await strip.locator('[aria-current="true"].focused .filmstrip-title').textContent(), titles[2]);
+
+  await page.keyboard.press('ArrowLeft');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.locator('#ptitle').textContent(), titles[1]);
+  assert.equal(await strip.isVisible(), false);
+  await page.keyboard.press('ArrowDown');
+  for (let i = 1; i < 8; i++) await page.keyboard.press('ArrowRight');
+  assert.equal(await strip.locator('.focused .filmstrip-title').textContent(), titles[8]);
+  await strip.locator('.focused').click();
+  assert.equal(await page.locator('#ptitle').textContent(), titles[8]);
+  await page.locator('#playerBack').click();
+  assert.equal(await page.locator('#results .card.focused .ttl').textContent(), titles[2]);
+});
+
+test('History autoplay keeps its original order and skips an unavailable post', async t => {
+  const { page, requests } = await fixture(t, { playable: true });
+  await page.evaluate(() => localStorage.setItem('hellotv.history', JSON.stringify({
+    't:zeta2': { title: 'Last video', watchedAt: 10 },
+    't:alpha2': { title: 'Unavailable video', watchedAt: 20 },
+    't:beta2': { title: 'First video', watchedAt: 30 }
+  })));
+  await page.route('**/2/status/alpha2', route => route.fulfill({
+    status: 404, headers: { 'access-control-allow-origin': '*' }, body: '{}'
+  }));
+  await page.reload();
+  await page.locator('[data-nav="history"]').click();
+  await page.locator('#rows .card', { hasText: 'First video' }).click();
+  const playing = id => page.waitForFunction(id => {
+    const v = document.getElementById('video');
+    return v.readyState >= 3 && !v.paused && v.currentSrc.includes('/' + id + '/');
+  }, id);
+  await playing('beta2');
+  await page.locator('#video').evaluate(v => { v.currentTime = v.duration - 0.15; });
+  await playing('zeta2');
+  assert.ok(requests.some(url => url.endsWith('/2/status/zeta2')));
+});
+
 test('4K MP4 plays through its corrected HLS stream when the post has one', async t => {
   const { page, requests } = await fixture(t, { captions: true, uhdStream: true });
   await query(page);
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
   assert.match(await page.locator('#video').getAttribute('src'), /1280x720/);
-  await remote(page, 403);
+  await remote(page, 406);
   const variant = page.waitForRequest(request => request.url().includes('/video/2160.m3u8'));
   await page.locator('#qualityMenu .quality-option').getByText('2160p · 4K', { exact: true }).click();
   await variant;
@@ -664,7 +762,7 @@ test('vertical 4K MP4 finds its HLS variant by the short side', async t => {
   await query(page);
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
-  await remote(page, 403);
+  await remote(page, 406);
   const variant = page.waitForRequest(request => request.url().includes('/video/2160.m3u8'));
   await page.locator('#qualityMenu .quality-option').getByText('2160p · 4K', { exact: true }).click();
   await variant;
@@ -676,7 +774,7 @@ test('4K MP4 plays directly when its HLS stream has no 4K variant', async t => {
   await query(page);
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
-  await remote(page, 403);
+  await remote(page, 406);
   await page.locator('#qualityMenu .quality-option').getByText('2160p · 4K', { exact: true }).click();
   await page.waitForFunction(() => /3840x2160/.test(document.getElementById('video').getAttribute('src') || ''));
   assert.match(await page.locator('#qualityButton').innerText(), /2160p/);
@@ -711,24 +809,53 @@ test('HLS quality selector keeps 4K variants while defaulting to a 1080p-or-lowe
   assert.equal(await page.locator('#video').getAttribute('src'), null);
 });
 
-test('Stats for nerds is only on the Blue key and closes with the player', async t => {
-  const { page } = await fixture(t);
+test('the Red key toggles centred Telemetry independently of the filmstrip and timeline', async t => {
+  const { page } = await fixture(t, { playable: true });
   await query(page);
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
-  assert.equal(await page.locator('#chrome').getByText(/Stats/).count(), 0, 'no Stats button on screen');
+  const hint = page.locator('.player-key-hint');
+  assert.equal(await hint.isVisible(), true);
+  assert.equal(await hint.innerText(), 'Telemetry');
+  assert.equal(await hint.getByRole('img', { name: 'Red key' }).isVisible(), true);
+  const play = await page.locator('#playButton').boundingBox();
+  const post = await page.locator('#postButton').boundingBox();
+  const hintBounds = await hint.boundingBox();
+  assert.ok(play.x + play.width < hintBounds.x && hintBounds.x + hintBounds.width < post.x);
   await page.keyboard.press('ArrowDown');
-  assert.equal(await page.locator('#statsPanel.on').count(), 0, 'Down only moves focus');
-  await remote(page, 406);
-  assert.equal(await page.locator('#statsPanel.on').count(), 1);
-  assert.match(await page.locator('#statsPanel').innerText(), /Decoded resolution[\s\S]*Buffer ahead[\s\S]*Frames \/ dropped/);
-  assert.match(await page.locator('#statsPanel').innerText(), /Network\s+Online[\s\S]*Download speed[\s\S]*Video server/);
-  await page.locator('#statsClose').click();
-  assert.equal(await page.locator('#statsPanel.on').count(), 0);
-  await remote(page, 406);
-  assert.equal(await page.locator('#statsPanel.on').count(), 1);
+  const hud = page.getByRole('region', { name: 'Telemetry' });
+  assert.equal(await hud.isVisible(), false, 'Down only moves focus');
+  await remote(page, 403);
+  await hud.getByText('24 fps', { exact: true }).waitFor();
+  assert.match(await hud.innerText(), /Buffer ahead[\s\S]*Decoded resolution[\s\S]*Frames \/ dropped/i);
+  assert.match(await hud.innerText(), /Network\s+Online[\s\S]*Download speed[\s\S]*Video server/);
+  assert.equal(await hud.getByRole('button').count(), 0);
+  assert.equal(await page.evaluate(async () => (await document.fonts.load('700 26px "D-DIN"')).length), 1);
+  await page.waitForFunction(() => {
+    const panel = document.getElementById('statsPanel').getBoundingClientRect();
+    const player = document.getElementById('player').getBoundingClientRect();
+    return Math.abs(panel.left - player.left) < 1 &&
+      Math.abs((panel.top + panel.bottom) / 2 - (player.top + player.bottom) / 2) < 1;
+  });
+  const hudBounds = await hud.boundingBox();
+  const filmstrip = page.locator('#filmstrip');
+  assert.ok((await filmstrip.boundingBox()).x > hudBounds.x + hudBounds.width);
+
+  await remote(page, 403);
+  assert.equal(await hud.isVisible(), false);
+  assert.equal(await filmstrip.isVisible(), true);
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('#statsPanel.on').count(), 0);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#chrome').getAttribute('class'), 'hide');
+  await remote(page, 403);
+  assert.equal(await hud.isVisible(), true);
+  assert.equal(await page.locator('#chrome').getAttribute('class'), 'hide');
+  await page.keyboard.press('ArrowUp');
+  assert.equal(await page.locator('#playerBack.focused').count(), 1);
+  await page.keyboard.press('ArrowUp');
+  await page.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 38, repeat: true, bubbles: true })));
+  assert.equal(await page.locator('#chrome').getAttribute('class'), 'hide');
+  assert.equal(await hud.isVisible(), true);
 });
 
 test('broadcast chat receives updates, escapes text, supports remote tabs and closes with the player', async t => {
@@ -797,8 +924,9 @@ test('HLS version 6 decodes through MSE and quality switches preserve pause and 
   await page.locator('#results .card').filter({ hasText: 'Live launch' }).click();
   await page.waitForFunction(() => document.getElementById('video').readyState >= 3);
   await page.locator('#video').evaluate(video => { video.pause(); video.currentTime = 8; });
-  await remote(page, 406);
+  await remote(page, 403);
   assert.match(await page.locator('#statsPanel').innerText(), /640 × 360[\s\S]*HLS \(MSE\)/);
+  await page.locator('#statsPanel').getByText('24 fps', { exact: true }).waitFor();
   await page.locator('#qualityButton').click();
   await page.locator('#qualityMenu .quality-option').getByText('360p', { exact: true }).click();
   await page.waitForFunction(() => { const v = document.getElementById('video'); return v.readyState >= 3 && v.currentTime >= 7.5 && v.paused; });
@@ -827,6 +955,33 @@ test('closing a video saves its position and resumes after an app reload', async
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
   await page.waitForFunction(() => { const v = document.getElementById('video'); return v.readyState >= 3 && v.currentTime >= 7.5; });
+});
+
+test('timeline arrows scrub while paused and OK plays from the selected point', async t => {
+  const { page } = await fixture(t, { playable: true });
+  await query(page);
+  await chip(page, 'Videos');
+  await page.locator('#results .card').first().click();
+  await page.waitForFunction(() => {
+    const v = document.getElementById('video');
+    return v.readyState >= 3 && !v.paused;
+  });
+  await page.locator('#video').evaluate(v => { v.currentTime = 3; });
+  const playbackAt = (time, paused) => page.waitForFunction(({ time, paused }) => {
+    const v = document.getElementById('video');
+    return !v.seeking && v.paused === paused && Math.abs(v.currentTime - time) < 1;
+  }, { time, paused });
+
+  await page.keyboard.press('ArrowRight');
+  await playbackAt(13, true);
+  await page.keyboard.press('ArrowLeft');
+  await playbackAt(3, true);
+  await page.keyboard.press('ArrowRight');
+  await playbackAt(13, true);
+  await page.keyboard.press('Enter');
+  await playbackAt(13, false);
+  await remote(page, 412);
+  await playbackAt(3, false);
 });
 
 test('cursor clicks seek on the timeline and continue playback', async t => {
@@ -905,23 +1060,27 @@ test('unavailable historical posts stay in History with an error and never open 
   assert.equal(await page.locator('#rows .card').count(), 1);
 });
 
-test('Back hides all player overlays, ignores a held key, then exits on a second press', async t => {
+test('Back dismisses the timeline and Telemetry separately and ignores a held key', async t => {
   const { page } = await fixture(t, { playable: true });
   await query(page);
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
   await page.waitForFunction(() => { const v = document.getElementById('video'); return v.readyState >= 3 && !v.paused; });
-  await remote(page, 406);
+  await remote(page, 403);
   await page.locator('#postButton').click();
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('#app').getAttribute('class'), 'screen-player');
   assert.equal(await page.locator('#chrome').getAttribute('class'), 'hide');
-  assert.equal(await page.locator('#statsPanel.on, #postPanel.on, #qualityMenu.on, #captionsMenu.on').count(), 0);
+  assert.equal(await page.locator('#postPanel.on, #qualityMenu.on, #captionsMenu.on').count(), 0);
+  assert.equal(await page.locator('#statsPanel.on').count(), 1);
   await page.locator('#video').evaluate(v => v.dispatchEvent(new Event('playing')));
   assert.equal(await page.locator('#chrome').getAttribute('class'), 'hide', 'a buffering recovery cannot undo Back');
   await page.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 461, repeat: true, bubbles: true })));
   assert.equal(await page.locator('#app').getAttribute('class'), 'screen-player');
   assert.equal(await page.locator('#video').evaluate(v => v.paused), false);
+  await remote(page, 461);
+  assert.equal(await page.locator('#statsPanel.on').count(), 0);
+  assert.equal(await page.locator('#app').getAttribute('class'), 'screen-player');
   await remote(page, 461);
   assert.equal(await page.locator('#app').getAttribute('class'), 'screen-search');
 });
@@ -1018,11 +1177,12 @@ test('player arrows move focus and colour keys provide shortcuts', async t => {
   await chip(page, 'Videos');
   await page.locator('#results .card').first().click();
   await page.waitForFunction(() => document.getElementById('video').readyState >= 3);
-  assert.doesNotMatch(await page.locator('#chrome').innerText(), /Up \/ Down|Left \/ Right|Back again/, 'no remote instructions');
   assert.equal(await page.locator('#timeline.focused').count(), 1);
   await page.keyboard.press('ArrowUp');
   assert.equal(await page.locator('#playerBack.focused').count(), 1);
   await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await page.locator('#filmstrip .filmstrip-card.focused').count(), 1);
   await page.keyboard.press('ArrowDown');
   assert.equal(await page.locator('#playButton.focused').count(), 1);
   await page.keyboard.press('Enter');
@@ -1043,14 +1203,24 @@ test('player arrows move focus and colour keys provide shortcuts', async t => {
   await page.keyboard.press('Enter');
   assert.equal(await page.locator('#video').evaluate(v => v.paused), true);
   await remote(page, 404);
+  assert.equal(await page.locator('#captionsMenu.on').count(), 1);
+  assert.equal(await page.locator('#video').evaluate(v => v.paused), true);
+  await remote(page, 404);
+  assert.equal(await page.locator('#captionsMenu.on').count(), 0);
+  await remote(page, 415);
   assert.equal(await page.locator('#video').evaluate(v => v.paused), false);
   await remote(page, 405);
   assert.equal(await page.locator('#postPanel.on').count(), 1);
-  await remote(page, 403);
+  await remote(page, 405);
+  assert.equal(await page.locator('#postPanel.on').count(), 0);
+  await remote(page, 405);
+  assert.equal(await page.locator('#postPanel.on').count(), 1);
+  await remote(page, 406);
   assert.equal(await page.locator('#postPanel.on').count(), 0);
   assert.equal(await page.locator('#qualityMenu.on').count(), 1);
-  await page.keyboard.press('Escape');
-  await remote(page, 404);
+  await remote(page, 406);
+  assert.equal(await page.locator('#qualityMenu.on').count(), 0);
+  await remote(page, 19);
   assert.equal(await page.locator('#video').evaluate(v => v.paused), true);
 });
 
@@ -1184,6 +1354,52 @@ test('Back cancels a pending playback recovery without reopening the video', asy
   assert.equal(await page.locator('#video').getAttribute('src'), null);
 });
 
+test('mid-play buffering shows live download speed against stream bitrate and clears on resume or exit', async t => {
+  const { page } = await fixture(t, { playable: true, replay: true });
+  page.setDefaultTimeout(10000);
+  await page.evaluate(() => {
+    const trigger = Hls.prototype.trigger;
+    Hls.prototype.trigger = function (event, data) {
+      if (event === Hls.Events.FRAG_LOADED && data.frag.type === 'main') window.bufferTestFrag = data.frag;
+      return trigger.apply(this, arguments);
+    };
+  });
+  await query(page);
+  await page.locator('#results .badge.replay').waitFor();
+  await page.locator('#results .card').filter({ hasText: 'Live launch' }).click();
+  await page.waitForFunction(() => document.getElementById('video').currentTime > 0.1 && window.bufferTestFrag);
+  // Freeze playback so native waiting/canplay events cannot race the simulated stall.
+  await page.evaluate(() => new Promise(resolve => {
+    const video = document.getElementById('video');
+    if (video.paused) return resolve();
+    video.addEventListener('pause', resolve, { once: true });
+    video.pause();
+  }));
+  await page.locator('#video').evaluate(v => v.dispatchEvent(new Event('playing')));
+  assert.equal(await page.locator('#bufferingDetails').isVisible(), false);
+  await page.evaluate(() => {
+    const video = document.getElementById('video');
+    const stats = bufferTestFrag.stats;
+    stats.loading.start = performance.now() - 10000; stats.loading.end = 0;
+    stats.loaded = stats.total = 125000;
+    video.dispatchEvent(new Event('waiting'));
+  });
+  await page.locator('#bufferingDetails').waitFor({ state: 'visible' });
+  assert.match(await page.locator('#bufferingRates').textContent(), /Download 0\.1 Mbps · Stream bitrate 0\.5 Mbps/);
+  assert.equal(await page.locator('#bufferingReason').textContent(), 'Download is below the stream bitrate');
+  await page.evaluate(() => { bufferTestFrag.stats.loading.end = performance.now(); });
+  await page.waitForFunction(() => document.getElementById('bufferingRates').textContent.includes('(last segment)'));
+  await page.screenshot({ path: 'test-results/buffering-rates-preview.png' });
+  await page.locator('#video').evaluate(v => v.dispatchEvent(new Event('playing')));
+  assert.equal(await page.locator('#bufferingDetails').isVisible(), false);
+  await page.locator('#video').evaluate(v => v.dispatchEvent(new Event('waiting')));
+  assert.equal(await page.locator('#bufferingDetails').isVisible(), true);
+  await page.locator('#playerBack').click();
+  assert.equal(await page.locator('#bufferingDetails').isVisible(), false);
+  await page.waitForTimeout(1100);
+  assert.equal(await page.locator('#bufferingDetails').evaluate(el => el.style.display), 'none', 'the refresh timer stays stopped');
+});
+
 test('HLS quality changes keep the existing stream playing while the new playlist loads', async t => {
   const { page } = await fixture(t, { playable: true, replay: true, slowQuality: 1300 });
   await query(page);
@@ -1208,7 +1424,7 @@ test('Home shows the focused video artwork behind the header and anchors the foc
   const { page } = await fixture(t);
   await page.locator('[data-nav="home"]').click();
   await page.locator('#homeChips .home-chip[aria-label="Videos"]').click();
-  await page.waitForFunction(() => /logo\.png/.test(document.querySelector('#backdrop .bd.on')?.style.backgroundImage || ''));
+  await page.waitForFunction(() => /icon\.png/.test(document.querySelector('#backdrop .bd.on')?.style.backgroundImage || ''));
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
   const second = await page.evaluate(() => {
@@ -1259,4 +1475,77 @@ test('Settings turn animations and artwork off, survive a reload, and close with
   assert.equal(await page.locator('#rows .grid.enter').count(), 0, 'no entrance animation when animations are off');
   await page.keyboard.press('ArrowDown');
   assert.equal(await page.locator('#rows .grid').evaluate(el => el.style.transform), '', 'rows scroll without animation');
+});
+
+test('the expanded sidebar shows the footer and enlarges and inverts the focused coffee QR', async t => {
+  const { page } = await fixture(t);
+  assert.equal(await page.title(), 'Clicker');
+  const coffee = page.getByRole('button', { name: 'Buy me a coffee' });
+  const settings = page.locator('[data-nav="settings"]');
+  const qr = coffee.locator('img');
+  const tip = page.getByRole('tooltip');
+  const footer = page.locator('.app-version');
+  assert.equal(await coffee.isVisible(), false);
+  assert.equal(await footer.isVisible(), false);
+  await settings.hover();
+  assert.ok((await coffee.boundingBox()).y < (await settings.boundingBox()).y);
+  assert.equal(await qr.getAttribute('src'), 'white-qr-transparent.svg');
+  await page.waitForFunction(() => document.querySelector('.coffee-code img').naturalWidth > 0);
+  assert.equal(await footer.isVisible(), true);
+  const disclaimer = footer.locator('.app-source');
+  assert.equal(await disclaimer.textContent(), 'Public content from x.com');
+  const versionBounds = await footer.locator('.build-label').boundingBox();
+  assert.ok((await disclaimer.boundingBox()).x > versionBounds.x + versionBounds.width);
+  assert.ok((await footer.boundingBox()).height <= 22, 'version and disclaimer fit on one line');
+  assert.equal(await tip.isVisible(), false);
+  assert.equal(await qr.evaluate(img => getComputedStyle(img).filter), 'none');
+  const search = page.locator('#searchView');
+  assert.equal(await search.evaluate(el => getComputedStyle(el).filter), 'none');
+  assert.match(await search.evaluate(el => getComputedStyle(el).transitionProperty), /filter/);
+  assert.match(await settings.evaluate(el => getComputedStyle(el).transitionProperty), /filter/);
+  const compactWidth = (await qr.boundingBox()).width;
+  await coffee.hover();
+  await tip.waitFor();
+  await page.waitForFunction(width => document.querySelector('.coffee-code img').getBoundingClientRect().width >= width * 1.77, compactWidth);
+  assert.equal(await qr.evaluate(img => getComputedStyle(img).filter), 'invert(1)');
+  assert.equal(await qr.evaluate(img => getComputedStyle(img.parentElement).backgroundColor), 'rgb(255, 255, 255)');
+  assert.match(await tip.innerText(), /a coffee helps support its development[\s\S]*Stripe checkout/);
+  await page.waitForFunction(() => {
+    const filter = selector => getComputedStyle(document.querySelector(selector)).filter;
+    return filter('#searchView') === 'blur(8px) brightness(0.62)' &&
+      filter('[data-nav="settings"]') === 'blur(4px) brightness(0.62)' &&
+      filter('.app-version') === 'blur(4px) brightness(0.62)';
+  });
+  assert.equal(await coffee.evaluate(el => getComputedStyle(el).filter), 'none');
+  assert.equal(await tip.evaluate(el => getComputedStyle(el).filter), 'none');
+  const buttonBounds = await coffee.boundingBox();
+  const codeBounds = await coffee.locator('.coffee-code').boundingBox();
+  const labelBounds = await coffee.locator('.lbl').boundingBox();
+  assert.ok(buttonBounds.y <= codeBounds.y && codeBounds.y + codeBounds.height <= labelBounds.y);
+  assert.ok(buttonBounds.y + buttonBounds.height < (await settings.boundingBox()).y);
+  assert.ok((await tip.boundingBox()).x > buttonBounds.x + buttonBounds.width);
+  await page.mouse.move(40, 740);
+  assert.equal(await tip.isVisible(), false);
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('searchView')).filter === 'none' &&
+    getComputedStyle(document.querySelector('[data-nav="settings"]')).filter === 'none');
+  await settings.click();
+  assert.match(await page.locator('.settings-about').innerText(), /^Clicker /);
+  assert.equal(await page.locator('#settings').getByText('Buy me a coffee').count(), 0);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ArrowUp');
+  assert.match(await coffee.getAttribute('class'), /focused/);
+  assert.equal(await tip.isVisible(), true);
+  assert.equal(await qr.evaluate(img => getComputedStyle(img).filter), 'invert(1)');
+  await page.evaluate(() => { window.open = url => { window.openedCheckout = url; }; });
+  await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(() => window.openedCheckout), await page.evaluate(() => HELLO_TV.coffeeUrl));
+  await page.keyboard.press('ArrowDown');
+  assert.equal(await tip.isVisible(), false);
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await coffee.isVisible(), false);
+  assert.equal(await footer.isVisible(), false);
+  await page.locator('[data-nav="home"]').click();
+  await settings.hover();
+  await coffee.hover();
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('stage')).filter === 'blur(8px) brightness(0.62)');
 });

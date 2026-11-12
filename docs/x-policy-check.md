@@ -1,4 +1,4 @@
-# X policy check: hello-tv
+# X policy check for Clicker
 
 Checked on 2026-10-10 against the [X Terms of Service](https://x.com/en/tos) (effective October 9, 2026), the [X Developer Policy](https://docs.x.com/developer-terms/policy) and the [Display requirements](https://docs.x.com/developer-terms/display-requirements). This is a reading of X's published text, not legal advice.
 

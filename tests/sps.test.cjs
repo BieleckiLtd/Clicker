@@ -51,6 +51,13 @@ test('a correct or unreadable init segment is left alone', () => {
   assert.equal(sps.fixInit(buffer().slice(0, 500)), null, 'truncated');
 });
 
+test('video frame rate comes from MP4 sample timing and fMP4 defaults', () => {
+  const mp4 = fs.readFileSync(path.join(__dirname, 'fixtures/playback.mp4'));
+  assert.equal(sps.frameRate(mp4), 24);
+  assert.ok(Math.abs(sps.frameRate(buffer()) - 24000 / 1001) < 0.001);
+  assert.equal(sps.frameRate(mp4.subarray(0, 500)), 0);
+});
+
 test('a sample duration that is slightly off snaps to the nearest standard rate', () => {
   const bytes = Buffer.from(init);
   const trex = bytes.indexOf('trex');

@@ -139,7 +139,7 @@
     if (!item || !item.id || (!played && !history[item.id] && !positions[item.id])) return;
     var old = history[item.id];
     var entry = { id: item.id, watchedAt: played ? Date.now() : (old && old.watchedAt) || (positions[item.id] && positions[item.id].at) || 0 };
-    var fields = ['title', 'thumbnail', 'postId', 'postText', 'postUrl', 'replyCount', 'authorName', 'authorHandle',
+    var fields = ['title', 'thumbnail', 'postId', 'postText', 'postUrl', 'replyCount', 'repostCount', 'likeCount', 'authorName', 'authorHandle',
       'authorAvatar', 'publishedAt', 'views', 'durationSec', 'broadcastId', 'live', 'replay'];
     for (var i = 0; i < fields.length; i++) if (item[fields[i]] !== undefined) entry[fields[i]] = item[fields[i]];
     if (JSON.stringify(old) === JSON.stringify(entry)) return;

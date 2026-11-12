@@ -3,13 +3,17 @@
 <head>
 <meta charset="utf-8">
 <meta name="referrer" content="never">
-<title>X TV</title>
-<link rel="stylesheet" href="style.css?v=1.7.1">
+<title>Clicker</title>
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="stylesheet" href="style.css?v=1.7.9">
 </head>
 <body>
 <div id="app" class="screen-browse">
   <nav id="nav">
-    <div class="brand"><img class="logo" alt="" src="logo.png"></div>
+    <div class="brand">
+      <img class="brand-symbol" src="clicker-symbol.svg" alt="Clicker">
+      <img class="brand-wordmark" src="clicker-logo.svg" alt="Clicker">
+    </div>
     <button type="button" class="nav-btn" data-nav="home">
       <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 10.2 12 3.5l8.5 6.7V20h-5.5v-6h-6v6H3.5z"/></svg></span>
       <span class="lbl">Home</span>
@@ -30,12 +34,20 @@
       <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12H4m7-7-7 7 7 7"/></svg></span>
       <span class="lbl">Back</span>
     </button>
+    <button type="button" id="coffeeButton" class="nav-btn" data-nav="coffee" aria-label="Buy me a coffee" aria-describedby="coffeeTip" hidden>
+      <span class="coffee-code-row"><span class="coffee-code"><img src="white-qr-transparent.svg" alt=""></span></span>
+      <span class="lbl">Buy me a coffee</span>
+    </button>
     <button type="button" class="nav-btn" data-nav="settings">
       <span class="ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9.04 21.71 9.62v4.76L19 14.96l1.55 2.23-3.36 3.36L14.96 19l-.58 2.71H9.62L9.04 19l-2.23 1.55-3.36-3.36L4.96 14.86 2.29 14.38V9.62L5 9.04 3.45 6.81l3.36-3.36L9.04 5l.58-2.71h4.76L14.96 5l2.23-1.55 3.36 3.36z"/><circle cx="12" cy="12" r="3"/></svg></span>
       <span class="lbl">Settings</span>
     </button>
-    <div class="app-version">v<span class="build-label">1.7.1</span></div>
+    <div class="app-version">v<span class="build-label">1.7.9</span> <span class="app-source">Public content from x.com</span></div>
   </nav>
+  <aside id="coffeeTip" role="tooltip">
+    <p>If you enjoy Clicker, buying me a coffee helps support its development.</p>
+    <p>Scan with your phone to open <strong>Stripe</strong> checkout.</p>
+  </aside>
 
   <div id="stage">
     <div id="backdrop" aria-hidden="true"><div class="fade"><div class="bd"></div><div class="bd"></div></div></div>
@@ -74,20 +86,21 @@
     <div class="settings-sheet">
       <div class="settings-heading"><h2 id="settingsTitle">Settings</h2><button id="settingsClose" class="panel-close" type="button" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
       <div id="settingsList"></div>
-      <div class="settings-foot"><div class="settings-about">X TV <span class="build-label">1.7.1</span> · Public videos and broadcasts from X</div></div>
+      <div class="settings-foot"><div class="settings-about">Clicker <span class="build-label">1.7.9</span> · Public videos and broadcasts from X</div></div>
     </div>
   </div>
 
   <div id="player">
     <video id="video" referrerpolicy="no-referrer"></video>
     <div id="loadLabel">Loading</div>
+    <div id="bufferingDetails"><div id="bufferingRates"></div><div id="bufferingReason"></div></div>
     <div id="errLabel"></div>
     <div id="seekPop"></div>
     <div id="centerIcon">
       <div class="tri"></div>
       <div class="bars"><i></i><i></i></div>
     </div>
-    <div id="statsPanel"></div>
+    <div id="statsPanel" role="region" aria-label="Telemetry"></div>
     <div id="postPanel"></div>
     <div id="chrome" class="on">
       <button type="button" class="player-back" id="playerBack" aria-label="Back"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5m7-7-7 7 7 7"/></svg></button>
@@ -104,8 +117,10 @@
           </div>
           <span id="tend"></span>
         </div>
+        <div id="filmstrip" role="group" aria-label="Playback queue" hidden></div>
         <div class="player-controls">
           <button type="button" class="player-action round" id="playButton" aria-label="Pause"><svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 5v14M15.5 5v14"/></svg><svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M7.5 4.8v14.4L19 12z"/></svg></button>
+          <span class="player-key-hint"><span class="player-red-key" role="img" aria-label="Red key"></span>Telemetry</span>
           <div class="spacer"></div>
           <button type="button" class="player-action" id="captionsButton" aria-pressed="false" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10.6 10a2.4 2.4 0 1 0 0 4M17.1 10a2.4 2.4 0 1 0 0 4"/></svg><span>Captions</span></button>
           <button type="button" class="player-action" id="postButton" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 4H4v13h5l4 4v-4h7V4Z"/><path d="M8 8h8M8 12h5"/></svg><span>Post &amp; comments</span></button>
@@ -134,20 +149,20 @@
   </div>
   <div id="toast"></div>
 </div>
-<script src="config.js"></script>
+<script src="config.js?v=1.7.9"></script>
 <script src="favourites.js"></script>
-<script src="catalog.js"></script>
+<script src="catalog.js?v=1.7.9"></script>
 <script src="broadcast.js"></script>
 <script src="captions.js"></script>
 <script src="vendor/nacl-fast.min.js"></script>
 <script src="vendor/qrcode.js"></script>
-<script src="groq.js?v=1.7.1"></script>
+<script src="groq.js?v=1.7.9"></script>
 <script src="transcription.js"></script>
-<script src="sps.js"></script>
-<script src="network.js"></script>
+<script src="sps.js?v=1.7.9"></script>
+<script src="network.js?v=1.7.9"></script>
 <script src="vendor/hls.min.js"></script>
 <!-- Emoji artwork: Twemoji, Twitter and contributors, CC BY 4.0. See vendor/README.md. -->
 <script src="vendor/twemoji.min.js"></script>
-<script src="main.js"></script>
+<script src="main.js?v=1.7.9"></script>
 </body>
 </html>

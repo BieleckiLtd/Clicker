@@ -33,7 +33,7 @@ Previous deployment: 2026-10-12, Codex. Version 1.4.2 was packaged, installed, a
 
 ## Product and source constraints
 
-X TV browses public channels and plays their videos and broadcasts directly on the TV, without a PC content server or X login. Search matches channel names and handles, then aggregates recent media; it does not search every X post by keyword. Public-source availability can vary. Errors and partial results are displayed rather than reported as an empty successful search.
+Clicker browses public channels and plays their videos and broadcasts directly on the TV, without a PC content server or X login. Search matches channel names and handles, then aggregates recent media; it does not search every X post by keyword. Public-source availability can vary. Errors and partial results are displayed rather than reported as an empty successful search.
 
 No account tokens, cookies, or credentialed X requests were added. The source investigation remains in [x-policy-check.md](x-policy-check.md).
 
