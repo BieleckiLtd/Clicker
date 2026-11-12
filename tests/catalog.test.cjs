@@ -122,3 +122,28 @@ test('portrait videos are named by their short side, play up to 1080p, and keep 
   assert.deepEqual(Array.from(clip.qualities, quality => quality.label), ['1080p', '720p', '480p']);
   assert.equal(clip.captionSource, 'https://video.twimg.com/amplify_video/9/pl/master.m3u8?tag=29');
 });
+
+test('a channel lists only its own videos, including older ones found by video search', async () => {
+  const video = (id, handle, extra = {}) => ({ type: 'status', id, text: handle + ' clip ' + id, created_timestamp: 1000 - Number(id), author: { screen_name: handle },
+    media: { videos: [{ duration: 20, thumbnail_url: 'https://pbs.twimg.com/' + id + '.jpg', formats: [{ url: 'https://video.twimg.com/' + id + '/720x1280/c.mp4', container: 'mp4' }] }] }, ...extra });
+  const searches = [];
+  const { api } = catalog(['NASA'], url => {
+    if (url.pathname === '/2/profile/NASA/statuses') return { body: { results: [
+      video('1', 'NASA'),
+      video('2', 'NASAJohnson', { reposted_by: { screen_name: 'NASA' } }),
+      video('3', 'WhiteHouse'),
+      { type: 'status', id: '4', text: 'Look at this', created_timestamp: 996, author: { screen_name: 'NASA' }, quote: video('5', 'airandspace') },
+      { type: 'status', id: '6', text: 'Our clip again', created_timestamp: 994, author: { screen_name: 'NASA' }, quote: video('7', 'nasa') }
+    ] } };
+    if (url.pathname === '/2/search') {
+      searches.push(url.searchParams.get('q') + (url.searchParams.get('cursor') ? ' @' + url.searchParams.get('cursor') : ''));
+      return url.searchParams.get('cursor') ? { body: { results: [video('9', 'NASA')] } } :
+        { body: { results: [video('1', 'NASA'), video('8', 'NASA')], cursor: { bottom: 'page2' } } };
+    }
+    return { body: '' };
+  });
+  const data = await new Promise((resolve, reject) => api.load(false, (error, result) => error ? reject(error) : resolve(result)));
+  const ids = Array.from(data.rows.find(row => row.id === 'nasa').items, item => item.postId);
+  assert.deepEqual(ids.sort(), ['1', '7', '8', '9'], 'reposts and other accounts\' posts or quotes are left out; duplicates appear once');
+  assert.deepEqual(searches, ['from:NASA filter:videos', 'from:NASA filter:videos @page2']);
+});

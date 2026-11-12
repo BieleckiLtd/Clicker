@@ -534,8 +534,15 @@
     return fromText ? fromText[1] : null;
   }
 
-  function broadcastIdFromStatus(status) {
-    return broadcastIdFrom(status) || broadcastIdFrom(status && status.quote);
+  // Broadcasts linked in the post itself, or in a quoted post by the same account.
+  function broadcastIdFromStatus(status, handle) {
+    var quote = status && status.quote;
+    return broadcastIdFrom(status) || (byHandle(quote, handle) ? broadcastIdFrom(quote) : null);
+  }
+
+  function byHandle(status, handle) {
+    var name = status && status.author && status.author.screen_name;
+    return !!name && !!handle && String(name).toLowerCase() === String(handle).toLowerCase();
   }
 
   function baseItem(status) {
@@ -657,13 +664,15 @@
     for (var i = 0; i < statuses.length; i++) {
       var status = statuses[i];
       if (!status || (status.type && status.type !== 'status')) continue;
+      // Reposts and posts by other accounts are not this channel's videos.
+      if (status.reposted_by || (status.author && !byHandle(status, handle))) continue;
       var clip = videoItem(status);
-      if (!clip && status.quote && status.quote.id) clip = videoItem(status.quote);
+      if (!clip && status.quote && status.quote.id && byHandle(status.quote, handle)) clip = videoItem(status.quote);
       if (clip && !seenVideo[clip.id]) {
         seenVideo[clip.id] = true;
         videos.push(clip);
       }
-      var bid = broadcastIdFromStatus(status);
+      var bid = broadcastIdFromStatus(status, handle);
       if (bid && !seen[bid]) {
         seen[bid] = true;
         items.push(pendingBroadcast(status, bid));
@@ -704,7 +713,7 @@
     page(null, 0, 0);
   }
 
-  function fetchStatuses(handle, cb) {
+  function fetchTimeline(handle, cb) {
     fetchList(handle, 'statuses', function (err, list) {
       if (!err && list && list.length) return cb(null, list);
       fetchList(handle, 'media', function (err2, media) {
@@ -712,6 +721,52 @@
         cb(err || err2 || null, media || list || []);
       });
     });
+  }
+
+  // The profile timeline stops after about 30 posts, most of them photos or reposts.
+  // A from:<handle> video search reaches months further back with the account's own videos.
+  // 2 pages of 20 fill a channel's 40 cards. The TV draws every card at once, so keep it bounded.
+  var VIDEO_SEARCH_PAGES = 2;
+  var CHANNEL_ITEMS = 40;
+  function fetchVideoSearch(handle, cb) {
+    var all = [];
+    var q = encodeURIComponent('from:' + handle + ' filter:videos');
+    function page(cursor, n) {
+      var target = 'https://api.fxtwitter.com/2/search?q=' + q + (cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+      httpGet(target, 20000, function (err, status, text) {
+        var data = parseJson(text);
+        var results = !err && status === 200 && data && data.results;
+        if (results && results.length) {
+          for (var i = 0; i < results.length; i++) all.push(results[i]);
+          var next = data.cursor && data.cursor.bottom;
+          if (next && n + 1 < VIDEO_SEARCH_PAGES) return page(next, n + 1);
+        }
+        cb(all);
+      });
+    }
+    page(null, 0);
+  }
+
+  function fetchStatuses(handle, cb) {
+    var left = 2, timeline = null, timelineError = null, videos = [];
+    function done() {
+      left -= 1;
+      if (left) return;
+      var out = [], seen = {};
+      var lists = [timeline || [], videos];
+      for (var l = 0; l < lists.length; l++) {
+        for (var i = 0; i < lists[l].length; i++) {
+          var status = lists[l][i];
+          var key = status && status.id ? '$' + status.id : null;
+          if (key && seen[key]) continue;
+          if (key) seen[key] = true;
+          out.push(status);
+        }
+      }
+      cb(out.length ? null : timelineError, out);
+    }
+    fetchTimeline(handle, function (err, list) { timelineError = err; timeline = list; done(); });
+    fetchVideoSearch(handle, function (list) { videos = list; done(); });
   }
 
   function parallel(fns, done) {
@@ -758,7 +813,7 @@
         id: String(group.handle || '').toLowerCase(),
         title: group.name || group.handle,
         avatar: group.avatar || '',
-        items: groupItems.slice(0, 18),
+        items: groupItems.slice(0, CHANNEL_ITEMS),
         note: group.error || ''
       });
     }

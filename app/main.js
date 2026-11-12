@@ -647,7 +647,8 @@
         (option.id === 'hot' ? hotScore(b, now) - hotScore(a, now) : 0) ||
         (b.publishedAt || 0) - (a.publishedAt || 0);
     });
-    return items;
+    // Hot, Live and Videos combine every channel; the TV draws each card, so keep the newest 60.
+    return option.row ? items : items.slice(0, 60);
   }
 
   function showToast(msg) {

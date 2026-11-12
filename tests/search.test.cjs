@@ -236,7 +236,8 @@ test('search aggregates six channels, deduplicates clips, resolves Live and filt
   await chip(page, 'Channels');
   assert.equal(await page.locator('#results .channel').count(), 8);
   assert.equal(requests.some(url => /\/profile\/(eta|theta)\//.test(url)), false);
-  assert.equal(requests.some(url => /\/2\/search/.test(url)), false);
+  assert.ok(requests.filter(url => /\/2\/search/.test(url)).every(url => /[?&]q=from%3A\w+%20filter%3Avideos/.test(url)),
+    'only per-channel video searches, never a keyword video search');
 });
 
 test('remote traverses grid rows, scrolls, handles final row, chips, keyboard and rail', async t => {
