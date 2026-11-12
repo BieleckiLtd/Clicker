@@ -331,6 +331,7 @@ html.artwork #backdrop { display: block; }
 .setting.focused.on .switch { background: #000; }
 .setting.focused.on .switch:after { background: #fff; }
 .settings-foot { position: absolute; left: 56px; right: 56px; bottom: 56px; font-size: 18px; line-height: 28px; color: var(--text-3); }
+.settings-disclaimer { margin-top: 8px; font-size: 16px; line-height: 24px; }
 .setting-arrow { position: absolute; right: 44px; top: 50%; margin-top: -25px; font-size: 46px; line-height: 50px; }
 
 /* Phone connection stays above Settings and playback, without transforming the video. */
