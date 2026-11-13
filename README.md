@@ -4,6 +4,8 @@ A TV app for LG webOS TVs that plays videos and live broadcasts from public X ch
 
 [![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/7sY00k9G4f1geDHe5Y8Ra00)
 
+If you enjoy Clicker, buying me a coffee helps support its development. The button opens **Stripe** checkout.
+
 ![Clicker playing a SpaceX video in 4K](docs/screenshot.png)
 
 ## 1. Set up your TV (once)
@@ -44,3 +46,5 @@ Clicker now appears in your TV's app list. To update it later, run `git pull` an
 ---
 
 More detail: [development notes](docs/development.md). Third-party licences: [app/vendor/README.md](app/vendor/README.md).
+
+All videos, posts and comments come from x.com. Clicker and its author are not affiliated with, endorsed by or sponsored by X Corp.
