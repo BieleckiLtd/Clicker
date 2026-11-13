@@ -2,6 +2,8 @@
 
 A TV app for LG webOS TVs that plays videos and live broadcasts from public X channels. No X login needed.
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://buy.stripe.com/7sY00k9G4f1geDHe5Y8Ra00)
+
 ![Clicker playing a SpaceX video in 4K](docs/screenshot.png)
 
 ## 1. Set up your TV (once)
